@@ -412,44 +412,6 @@ function saveAllPrices() {
 }
 
 // ══════════════════════════════════════
-// ADMIN SIDEBAR — add Employees link
-// ══════════════════════════════════════
-// Patch buildAdminNav to include Employees
-const _origBuildAdminNav = buildAdminNav;
-buildAdminNav = function() {
-  _origBuildAdminNav();
-  const nav = $('adminNav'); if (!nav) return;
-  // Add Employees entry if not present
-  if (!nav.querySelector('[data-emp]')) {
-    const sepDiv = nav.querySelector('.sb-sep:last-of-type');
-    const empLnk = document.createElement('div');
-    empLnk.className = 'sb-lnk';
-    empLnk.setAttribute('data-emp', '1');
-    empLnk.innerHTML = '<span class="sb-ic">👷</span> Employees';
-    empLnk.onclick = function() { apanel('employees', this); };
-    if (sepDiv) nav.insertBefore(empLnk, sepDiv.nextSibling); else nav.appendChild(empLnk);
-    // Also patch apanel for employees
-  }
-};
-
-// Patch apanel to handle employees
-const _origApanel = apanel;
-apanel = function(n, el) {
-  _origApanel(n, el);
-  if (n === 'employees') {
-    document.querySelectorAll('#adminPg .dpanel').forEach(p => p.classList.remove('on'));
-    $('ap-employees')?.classList.add('on');
-    if (el) { document.querySelectorAll('#adminNav .sb-lnk').forEach(l => l.classList.remove('on')); el.classList.add('on'); }
-    renderEmployees();
-  }
-};
-
-// ══════════════════════════════════════
-// MOBILE NAV for Admin — add Employees
-// ══════════════════════════════════════
-// Already handled via sidebar
-
-// ══════════════════════════════════════
 // INVOICE — add order date + dynamic QR
 // ══════════════════════════════════════
 const _origBuildInvoiceHTML = buildInvoiceHTML;
@@ -2883,7 +2845,9 @@ function buildAdminNav(){
     <div class="sb-sep"></div>
     <div class="sb-lnk" onclick="apanel('services',this)"><span class="sb-ic">🛠️</span> Catalogue</div>
     <div class="sb-lnk" onclick="apanel('prices',this)"><span class="sb-ic">💲</span> Manage Prices</div>
-    <div class="sb-lnk" onclick="apanel('revenue',this)"><span class="sb-ic">💰</span> Revenue</div>`;
+    <div class="sb-lnk" onclick="apanel('revenue',this)"><span class="sb-ic">💰</span> Revenue</div>
+    <div class="sb-sep"></div>
+    <div class="sb-lnk" onclick="apanel('employees',this)"><span class="sb-ic">👷</span> Employees<span style="background:rgba(59,130,246,.18);color:#60a5fa;font-size:.65rem;font-weight:700;padding:.1rem .45rem;border-radius:20px;margin-left:.4rem;">${EMP_DB.list().filter(e=>e.status==='active').length} active</span></div>`;
   // re-attach active state
   document.querySelectorAll('#adminNav .sb-lnk').forEach(l=>{
     l.addEventListener('click',function(){
@@ -2917,6 +2881,7 @@ function apanel(n,el){
   if(n==='services') renderAdminSvcs();
   if(n==='revenue'){renderRevenueDash();}
   if(n==='prices') renderPriceMgmt();
+  if(n==='employees') renderEmployees();
   SVCS.forEach(s=>{if(n==='svc-'+s.id) renderSvcPanel(s.id,s.name);});
 }
 
@@ -3504,8 +3469,12 @@ function showReservationModal(b,newStatus){
         </div>
         ${newStatus==='confirmed'||newStatus==='inprogress'?`
         <div style="margin-bottom:1rem;">
-          <label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Assign Professional (Optional)</label>
-          <input type="text" id="assign-pro" placeholder="e.g. Murugan Kumar — 94XXX XXXXX" style="width:100%;background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.65rem 1rem;color:var(--tx);font-family:var(--fb);font-size:.86rem;outline:none;">
+          <label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Assign Professional</label>
+          <select id="assign-pro" style="width:100%;background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.65rem 1rem;color:var(--tx);font-family:var(--fb);font-size:.86rem;outline:none;appearance:auto;">
+            <option value="">— Select Employee (Optional) —</option>
+            ${EMP_DB.list().filter(e=>e.status==='active').map(e=>`<option value="${e.name} — ${e.phone}">${e.name} · ${e.role} · ${e.phone}</option>`).join('')}
+            ${EMP_DB.list().filter(e=>e.status==='active').length===0?'<option disabled>No active employees — add from Employees tab</option>':''}
+          </select>
         </div>
         <div style="margin-bottom:1rem;">
           <label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Estimated Arrival / ETA</label>
