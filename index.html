@@ -7,7 +7,640 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Leaflet Maps (free, no API key) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+// ══════════════════════════════════════
+// EMPLOYEES DATA & FUNCTIONS
+// ══════════════════════════════════════
+const EMP_DB = {
+  g: k => { try { return JSON.parse(localStorage.getItem('sn_emp_' + k)) ?? []; } catch { return []; } },
+  s: (k, v) => localStorage.setItem('sn_emp_' + k, JSON.stringify(v)),
+  list: () => EMP_DB.g('list'),
+  add: e => { const a = EMP_DB.list(); a.push(e); EMP_DB.s('list', a); },
+  up: (id, c) => { const a = EMP_DB.list(); const i = a.findIndex(e => e.id === id); if (i > -1) { a[i] = { ...a[i], ...c }; EMP_DB.s('list', a); } },
+  del: id => EMP_DB.s('list', EMP_DB.list().filter(e => e.id !== id)),
+  find: id => EMP_DB.list().find(e => e.id === id || e.empId === id || e.email === id),
+};
+
+// Seed demo employee
+(function() {
+  if (!EMP_DB.list().length) {
+    EMP_DB.add({ id: 'emp_001', empId: 'EMP001', name: 'Murugan Kumar', email: 'emp@servenow.in', pass: 'emp123', phone: '+91 94111 22333', role: 'AC Technician', skills: 'AC Service, Electrical', status: 'active', joined: fmtDT(new Date()) });
+    EMP_DB.add({ id: 'emp_002', empId: 'EMP002', name: 'Selvan R', email: 'selvan@servenow.in', pass: 'emp123', phone: '+91 94222 33444', role: 'Electrician', skills: 'Electrical, Home Cleaning', status: 'active', joined: fmtDT(new Date()) });
+  }
+})();
+
+let CUR_EMP = null;
+
+function doEmployeeLogin() {
+  const id = v('emp-li-id'), pw = v('emp-li-pw');
+  if (!id || !pw) return toast('Enter Employee ID and password.', 'err');
+  const emp = EMP_DB.find(id.toLowerCase()) || EMP_DB.find(id);
+  if (!emp || emp.pass !== pw) return toast('Invalid credentials.', 'err');
+  if (emp.status !== 'active') return toast('Your account is inactive. Contact admin.', 'err');
+  CUR_EMP = emp;
+  toast('✅ Welcome, ' + emp.name + '!');
+  setTimeout(() => loadEmployeeDash(emp), 600);
+}
+
+function loadEmployeeDash(emp) {
+  CUR_EMP = emp;
+  pg('empPg');
+  const init = emp.name.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+  $('emp-av').textContent = init;
+  $('emp-name').textContent = emp.name;
+  $('emp-role').textContent = emp.role;
+  $('emp-welcome').textContent = 'Welcome, ' + emp.name.split(' ')[0] + '! 👋';
+  $('emp-pf-name').value = emp.name;
+  $('emp-pf-id').value = emp.empId;
+  $('emp-pf-role').value = emp.role;
+  $('emp-pf-phone').value = emp.phone;
+  showMobNav('employee');
+  epanel('overview', document.querySelector('#empSidebar .sb-lnk'));
+}
+
+function epanel(n, el) {
+  document.querySelectorAll('#empPg .dpanel').forEach(p => p.classList.remove('on'));
+  $('ep-' + n)?.classList.add('on');
+  if (el && el.closest && el.closest('.sb-nav')) {
+    document.querySelectorAll('#empSidebar .sb-lnk').forEach(l => l.classList.remove('on'));
+    el.classList.add('on');
+  }
+  if (n === 'overview') renderEmpOverview();
+  if (n === 'mytasks') renderEmpTasks('all');
+  if (n === 'completed') renderEmpCompleted();
+  if (n === 'profile') {}
+}
+
+function getMyAssignedBks() {
+  if (!CUR_EMP) return [];
+  return DB.bks().filter(b => b.assignedTo && b.assignedTo.toLowerCase().includes(CUR_EMP.name.toLowerCase().split(' ')[0].toLowerCase()));
+}
+
+function renderEmpOverview() {
+  const bks = getMyAssignedBks();
+  const today = iso(new Date());
+  const todayBks = bks.filter(b => b.date === today);
+  const pending = bks.filter(b => b.status === 'confirmed').length;
+  const kpis = [
+    { ic: '📋', n: bks.length, l: 'Total Assigned' },
+    { ic: '📅', n: todayBks.length, l: "Today's Jobs" },
+    { ic: '🔧', n: bks.filter(b => b.status === 'inprogress').length, l: 'In Progress' },
+    { ic: '🏆', n: bks.filter(b => b.status === 'completed').length, l: 'Completed' },
+  ];
+  $('emp-kpis').innerHTML = kpis.map(k => `<div class="kpi"><div class="kpi-ic">${k.ic}</div><div class="kpi-n">${k.n}</div><div class="kpi-l">${k.l}</div></div>`).join('');
+  const badge = $('emp-task-badge');
+  if (badge) { badge.style.display = pending > 0 ? 'inline-block' : 'none'; badge.textContent = pending; }
+  $('emp-today-tasks').innerHTML = todayBks.length ? todayBks.map(empTaskRow).join('') : empBox("No tasks for today. Enjoy your day! 🌟");
+}
+
+function renderEmpTasks(f) {
+  let bks = getMyAssignedBks();
+  if (f === 'confirmed') bks = bks.filter(b => b.status === 'confirmed');
+  else if (f === 'inprogress') bks = bks.filter(b => b.status === 'inprogress');
+  else if (f === 'completed') bks = bks.filter(b => b.status === 'completed');
+  $('emp-tasks-list').innerHTML = bks.length ? bks.map(empTaskRow).join('') : empBox('No tasks match this filter.');
+}
+
+function empTaskFilt(f, el) {
+  document.querySelectorAll('#ep-mytasks .ftab').forEach(t => t.classList.remove('on'));
+  el.classList.add('on');
+  renderEmpTasks(f);
+}
+
+function renderEmpCompleted() {
+  const bks = getMyAssignedBks().filter(b => b.status === 'completed');
+  $('emp-done-list').innerHTML = bks.length ? bks.map(empTaskRow).join('') : empBox('No completed jobs yet. Keep up the great work!');
+}
+
+function empTaskRow(b) {
+  const canStart = b.status === 'confirmed';
+  const canComplete = b.status === 'inprogress';
+  return `<div class="br">
+    <div>
+      <div class="br-svc">${b.svc}</div><div class="br-sub">${b.sub}</div>
+      <div class="br-meta">👤 ${b.uname} | 📞 ${b.uphone}</div>
+      <div class="br-meta">📅 ${b.date} at ${b.time} | 📍 ${b.addr}</div>
+      ${b.lmk ? `<div class="br-meta">🏷️ ${b.lmk}</div>` : ''}
+      ${b.notes ? `<div class="br-meta">📝 ${b.notes}</div>` : ''}
+      ${b.eta ? `<div class="br-meta" style="color:var(--acc);">⏰ ETA: ${b.eta}</div>` : ''}
+      <div class="br-id">${b.id} • ${b.created}</div>
+      <div class="act-row">
+        ${canStart ? `<button class="abt" style="background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.4);color:var(--acc);font-weight:700;" onclick="empUpdateStatus('${b.id}','inprogress')">🔧 Start Work</button>` : ''}
+        ${canComplete ? `<button class="abt" style="background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.4);color:var(--gr);font-weight:700;" onclick="empUpdateStatus('${b.id}','completed')">✅ Mark Done</button>` : ''}
+        <button class="abt wa" onclick="openWhatsApp('${b.uphone}','Hello ${b.uname}! This is ${CUR_EMP ? CUR_EMP.name : 'your technician'} from ServeNow. I am assigned for your ${b.svc} on ${b.date} at ${b.time}. I will be at your location soon.')">💬 Contact Customer</button>
+        <button class="abt" style="color:var(--bl);border-color:rgba(59,130,246,.35);" onclick="getDirections('${b.addr.replace(/'/g, "\'")}','${b.lmk ? b.lmk.replace(/'/g, "\'") : ''}')">🗺️ Navigate</button>
+      </div>
+    </div>
+    <span class="badge b-${b.status}">${b.status === 'inprogress' ? 'In Progress' : b.status}</span>
+  </div>`;
+}
+
+function empUpdateStatus(bkId, status) {
+  DB.upBk(bkId, { status });
+  const b = DB.findBk(bkId);
+  if (b) sendNotification({ type: 'update', to: b.uemail, phone: b.uphone, name: b.uname, bkId: b.id, svc: b.svc, sub: b.sub, date: b.date, time: b.time, addr: b.addr, status });
+  toast(status === 'inprogress' ? '🔧 Work started! Customer notified.' : '✅ Job completed! Great work!');
+  renderEmpOverview();
+  renderEmpTasks('all');
+}
+
+function empChangePwd() {
+  const np = v('emp-pf-newpw');
+  if (!np || np.length < 6) return toast('Password must be at least 6 characters.', 'err');
+  EMP_DB.up(CUR_EMP.id, { pass: np });
+  $('emp-pf-newpw').value = '';
+  toast('✅ Password updated!');
+}
+
+// ══════════════════════════════════════
+// EMPLOYEES ADMIN MANAGEMENT
+// ══════════════════════════════════════
+function renderEmployees() {
+  const search = v('emp-search').toLowerCase();
+  let emps = EMP_DB.list();
+  if (search) emps = emps.filter(e => e.name.toLowerCase().includes(search) || (e.skills || '').toLowerCase().includes(search) || e.role.toLowerCase().includes(search));
+  $('emp-cnt').textContent = emps.length + ' Employee' + (emps.length !== 1 ? 's' : '');
+  const bks = DB.bks();
+  $('emp-list').innerHTML = emps.length ? emps.map(emp => {
+    const assigned = bks.filter(b => b.assignedTo && b.assignedTo.toLowerCase().includes(emp.name.toLowerCase().split(' ')[0].toLowerCase()));
+    const active = assigned.filter(b => ['confirmed', 'inprogress'].includes(b.status)).length;
+    const done = assigned.filter(b => b.status === 'completed').length;
+    return `<div class="cust-detail-card">
+      <div class="cust-card-hdr">
+        <div class="cust-big-av" style="background:linear-gradient(135deg,var(--bl),#60a5fa);">${emp.name.split(' ').map(p => p[0]).join('').slice(0,2).toUpperCase()}</div>
+        <div style="flex:1;">
+          <div style="font-family:var(--fh);font-weight:700;font-size:1rem;">${emp.name}</div>
+          <div style="color:var(--bl);font-size:.78rem;margin-top:.15rem;">${emp.empId} • ${emp.role}</div>
+          <div style="color:var(--mu);font-size:.75rem;margin-top:.1rem;">${emp.phone} | ${emp.email}</div>
+        </div>
+        <div style="text-align:right;">
+          <span class="badge ${emp.status === 'active' ? 'b-completed' : 'b-cancelled'}">${emp.status}</span>
+          <div style="font-size:.7rem;color:var(--mu);margin-top:.3rem;">${emp.skills || 'General'}</div>
+        </div>
+      </div>
+      <div class="cust-detail-grid">
+        <div class="cust-detail-item"><label>Active Jobs</label><span style="color:var(--acc);font-weight:700;">${active}</span></div>
+        <div class="cust-detail-item"><label>Completed Jobs</label><span style="color:var(--gr);font-weight:700;">${done}</span></div>
+        <div class="cust-detail-item"><label>Joined</label><span>${emp.joined || '—'}</span></div>
+        <div class="cust-detail-item"><label>Skills</label><span>${emp.skills || 'General'}</span></div>
+      </div>
+      <div class="cust-actions">
+        <button class="abt wa" onclick="openWhatsApp('${emp.phone}','Hello ${emp.name.split(' ')[0]}! Message from ServeNow admin.')">💬 WhatsApp</button>
+        <button class="abt" onclick="openAssignModal('${emp.id}')">📋 Assign Booking</button>
+        <button class="abt" style="color:var(--yl);border-color:rgba(245,158,11,.35);" onclick="adminResetEmpPwd('${emp.id}','${emp.name}')">🔑 Reset Password</button>
+        <button class="abt" style="color:${emp.status==='active'?'var(--rd)':'var(--gr)'};border-color:rgba(${emp.status==='active'?'239,68,68':'16,185,129'},.35);" onclick="toggleEmpStatus('${emp.id}')">${emp.status === 'active' ? '⏸ Deactivate' : '▶ Activate'}</button>
+        <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="delEmployee('${emp.id}')">🗑️ Remove</button>
+      </div>
+    </div>`;
+  }).join('') : empBox('No employees yet. Add your first team member.');
+}
+
+function openAssignModal(empId) {
+  const emp = EMP_DB.find(empId); if (!emp) return;
+  const pendingBks = DB.bks().filter(b => ['pending', 'confirmed'].includes(b.status));
+  const old = document.getElementById('assignModal'); if (old) old.remove();
+  document.body.style.overflow = 'hidden';
+  const modal = document.createElement('div');
+  modal.id = 'assignModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:520px;max-height:80vh;overflow-y:auto;padding:1.6rem;">
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:.4rem;">📋 Assign Booking to ${emp.name}</h2>
+    <p style="color:var(--mu);font-size:.8rem;margin-bottom:1.2rem;">Select a booking to assign to this employee.</p>
+    ${pendingBks.length ? pendingBks.map(b => `<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:12px;padding:.9rem;margin-bottom:.6rem;cursor:pointer;transition:.2s;" onclick="doAssignBk('${b.id}','${empId}')" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--bdr)'">
+      <div style="font-family:var(--fh);font-weight:700;font-size:.9rem;">${b.svc} — ${b.sub}</div>
+      <div style="color:var(--mu);font-size:.78rem;margin-top:.2rem;">👤 ${b.uname} | 📅 ${b.date} at ${b.time}</div>
+      <div style="color:var(--mu);font-size:.75rem;">📍 ${b.addr}</div>
+      <div style="display:flex;justify-content:space-between;margin-top:.4rem;"><span style="font-family:monospace;font-size:.68rem;color:var(--mu2);">${b.id}</span><span class="badge b-${b.status}">${b.status}</span></div>
+    </div>`).join('') : empBox('No pending/confirmed bookings to assign.')}
+    <button onclick="document.getElementById('assignModal').remove();document.body.style.overflow='';" style="width:100%;margin-top:.8rem;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fb);cursor:pointer;">Close</button>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); document.body.style.overflow = ''; } });
+}
+
+function doAssignBk(bkId, empId) {
+  const emp = EMP_DB.find(empId); const b = DB.findBk(bkId);
+  if (!emp || !b) return;
+  DB.upBk(bkId, { assignedTo: emp.name, assignedEmpId: emp.empId, status: b.status === 'pending' ? 'confirmed' : b.status });
+  document.getElementById('assignModal')?.remove(); document.body.style.overflow = '';
+  sendNotification({ type: 'update', to: b.uemail, phone: b.uphone, name: b.uname, bkId: b.id, svc: b.svc, sub: b.sub, date: b.date, time: b.time, addr: b.addr, status: 'confirmed', msg: `Hello ${b.uname}! Your ServeNow booking ${b.id} has been confirmed. 👷 Assigned Professional: ${emp.name} (${emp.phone}). 📅 ${b.date} at ${b.time}. Thank you!` });
+  renderEmployees(); renderAdminBks(); buildAdminNav();
+  toast('✅ Booking assigned to ' + emp.name + '!');
+}
+
+function toggleEmpStatus(id) {
+  const emp = EMP_DB.find(id); if (!emp) return;
+  EMP_DB.up(id, { status: emp.status === 'active' ? 'inactive' : 'active' });
+  renderEmployees();
+  toast(emp.status === 'active' ? 'Employee deactivated.' : '✅ Employee activated!');
+}
+
+function delEmployee(id) {
+  if (!confirm('Remove this employee permanently?')) return;
+  EMP_DB.del(id); renderEmployees(); toast('Employee removed.');
+}
+
+function adminResetEmpPwd(id, name) {
+  const newPwd = Math.random().toString(36).slice(-8);
+  EMP_DB.up(id, { pass: newPwd });
+  alert(`Password for ${name} reset to:\n\n${newPwd}\n\nShare securely.`);
+  toast('✅ Password reset for ' + name);
+}
+
+function openAddEmployeeModal() {
+  const old = document.getElementById('addEmpModal'); if (old) old.remove();
+  document.body.style.overflow = 'hidden';
+  const modal = document.createElement('div');
+  modal.id = 'addEmpModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:460px;padding:1.6rem;">
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:1rem;">👷 Add New Employee</h2>
+    <div class="fg"><label>Full Name *</label><input type="text" id="ne-name" placeholder="e.g. Murugan Kumar"></div>
+    <div class="fr2">
+      <div class="fg"><label>Employee ID *</label><input type="text" id="ne-id" placeholder="e.g. EMP003"></div>
+      <div class="fg"><label>Phone *</label><input type="tel" id="ne-phone" placeholder="+91 94XXX XXXXX"></div>
+    </div>
+    <div class="fg"><label>Email</label><input type="email" id="ne-email" placeholder="emp@servenow.in"></div>
+    <div class="fg"><label>Role / Job Title *</label><input type="text" id="ne-role" placeholder="e.g. AC Technician, Electrician"></div>
+    <div class="fg"><label>Skills (services they can handle)</label><input type="text" id="ne-skills" placeholder="e.g. AC Service, Electrical"></div>
+    <div class="fg"><label>Password *</label><input type="password" id="ne-pass" placeholder="Min 6 characters"></div>
+    <div style="display:flex;gap:.7rem;margin-top:.5rem;">
+      <button onclick="document.getElementById('addEmpModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
+      <button onclick="submitAddEmployee()" style="flex:2;background:var(--bl);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">Add Employee →</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); document.body.style.overflow = ''; } });
+  attachFieldClearers();
+}
+
+function submitAddEmployee() {
+  const name = v('ne-name'), id = v('ne-id'), phone = v('ne-phone'), email = v('ne-email'), role = v('ne-role'), skills = v('ne-skills'), pass = v('ne-pass');
+  if (!name) { shakeField('ne-name'); return; }
+  if (!id) { shakeField('ne-id'); return; }
+  if (!phone) { shakeField('ne-phone'); return; }
+  if (!role) { shakeField('ne-role'); return; }
+  if (!pass || pass.length < 6) { shakeField('ne-pass'); return toast('Password must be 6+ characters.', 'err'); }
+  if (EMP_DB.list().some(e => e.empId === id)) return toast('Employee ID already exists.', 'err');
+  EMP_DB.add({ id: 'emp_' + Date.now(), empId: id, name, email: email || id.toLowerCase() + '@servenow.in', pass, phone, role, skills, status: 'active', joined: fmtDT(new Date()) });
+  document.getElementById('addEmpModal')?.remove(); document.body.style.overflow = '';
+  renderEmployees(); toast('✅ Employee added: ' + name);
+}
+
+// ══════════════════════════════════════
+// ADD NEW SERVICE MODAL
+// ══════════════════════════════════════
+function openAddServiceModal() {
+  const old = document.getElementById('addSvcModal'); if (old) old.remove();
+  document.body.style.overflow = 'hidden';
+  const modal = document.createElement('div');
+  modal.id = 'addSvcModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto;padding:1.8rem;">
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.2rem;margin-bottom:.4rem;">＋ Add New Service</h2>
+    <p style="color:var(--mu);font-size:.8rem;line-height:1.6;margin-bottom:1.3rem;">Add a new service category to your catalogue. It will appear on the home page and booking flow.</p>
+    <div class="fr2">
+      <div class="fg"><label>Emoji Icon *</label><input type="text" id="ns-em" placeholder="e.g. 🪴" maxlength="4"></div>
+      <div class="fg"><label>Service Name *</label><input type="text" id="ns-name" placeholder="e.g. Garden Care"></div>
+    </div>
+    <div class="fg"><label>Description *</label><textarea id="ns-desc" placeholder="Short description of the service…" style="min-height:70px;"></textarea></div>
+    <div class="fg"><label>Starting Price (e.g. From ₹499)</label><input type="text" id="ns-from" placeholder="From ₹499"></div>
+    <div class="fg"><label>Badges (comma-separated)</label><input type="text" id="ns-badges" placeholder="e.g. Certified,Same Day,Insured"></div>
+    <div class="fg"><label>Sub-services (one per line: Name|Price|Duration|Description)</label>
+      <textarea id="ns-subs" style="min-height:100px;" placeholder="Basic Trim|₹299|1 hr|Lawn and hedge trimming&#10;Deep Clean|₹599|2 hrs|Full garden cleanup"></textarea>
+    </div>
+    <div style="display:flex;gap:.7rem;margin-top:.5rem;">
+      <button onclick="document.getElementById('addSvcModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
+      <button onclick="submitNewService()" style="flex:2;background:var(--acc);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">Add Service →</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); document.body.style.overflow = ''; } });
+  attachFieldClearers();
+}
+
+function submitNewService() {
+  const em = v('ns-em'), name = v('ns-name'), desc = v('ns-desc'), from = v('ns-from') || 'Get Quote', badgesRaw = v('ns-badges'), subsRaw = v('ns-subs');
+  if (!em) { shakeField('ns-em'); return; }
+  if (!name) { shakeField('ns-name'); return; }
+  if (!desc) { shakeField('ns-desc'); return; }
+  const badges = badgesRaw ? badgesRaw.split(',').map(b => b.trim()).filter(Boolean) : ['Available Now'];
+  const subs = subsRaw ? subsRaw.split('\n').filter(l => l.trim()).map(line => {
+    const [sname, price, dur, sdesc] = line.split('|');
+    return { em: '🔧', name: sname?.trim() || 'Service', price: price?.trim() || 'On Request', dur: dur?.trim() || 'TBD', desc: sdesc?.trim() || 'Service description.' };
+  }) : [{ em: '🔧', name: 'Basic ' + name, price: from, dur: 'TBD', desc: 'Standard ' + name + ' service.' }];
+  const newId = name.toLowerCase().replace(/[^a-z0-9]/g, '_').substring(0, 12) + '_' + Date.now().toString().slice(-4);
+  SVCS.push({ id: newId, em, name, from, desc, badges, faqs: [{ q: 'How do I book this service?', a: 'Simply select this service and fill in the booking form.' }], subs });
+  document.getElementById('addSvcModal')?.remove(); document.body.style.overflow = '';
+  renderHome(); renderAdminSvcs();
+  toast('✅ New service "' + name + '" added!');
+}
+
+// ══════════════════════════════════════
+// REVENUE FILTER
+// ══════════════════════════════════════
+let curRevFilt = 'today';
+function setRevFilt(f, el) {
+  curRevFilt = f;
+  document.querySelectorAll('#ap-revenue .dbar-btn').forEach(b => b.classList.remove('on'));
+  if (el) el.classList.add('on');
+  renderRevenueDash();
+}
+
+// ══════════════════════════════════════
+// PRICE MANAGEMENT — Save + History
+// ══════════════════════════════════════
+let pendingPriceChanges = {};
+
+function showPriceTab(tab, el) {
+  document.querySelectorAll('#ap-prices .ftab').forEach(t => t.classList.remove('on'));
+  if (el) el.classList.add('on');
+  $('price-manage-tab').style.display = tab === 'manage' ? 'block' : 'none';
+  $('price-history-tab').style.display = tab === 'history' ? 'block' : 'none';
+  if (tab === 'history') renderPriceHistory();
+}
+
+function renderPriceHistory() {
+  const hist = JSON.parse(localStorage.getItem('sn_price_history') || '[]');
+  $('price-history-list').innerHTML = hist.length ? hist.slice().reverse().map(h => `<div class="br">
+    <div>
+      <div class="br-svc">${h.svcName} — ${h.subName || 'Base Price'}</div>
+      <div class="br-meta" style="display:flex;gap:1rem;align-items:center;margin-top:.3rem;">
+        <span style="color:var(--rd);text-decoration:line-through;">${h.oldPrice}</span>
+        <span style="color:var(--acc);">→</span>
+        <span style="color:var(--gr);font-weight:700;">${h.newPrice}</span>
+      </div>
+      <div class="br-id">${h.time} • Changed by Admin</div>
+    </div>
+  </div>`).join('') : empBox('No price changes recorded yet.');
+}
+
+function savePriceChange(svcName, subName, oldPrice, newPrice) {
+  const hist = JSON.parse(localStorage.getItem('sn_price_history') || '[]');
+  hist.push({ svcName, subName, oldPrice, newPrice, time: fmtDT(new Date()) });
+  localStorage.setItem('sn_price_history', JSON.stringify(hist.slice(-100)));
+}
+
+function clearPriceHistory() {
+  if (!confirm('Clear all price change history?')) return;
+  localStorage.removeItem('sn_price_history');
+  renderPriceHistory();
+  toast('Price history cleared.');
+}
+
+function saveAllPrices() {
+  let count = 0;
+  Object.entries(pendingPriceChanges).forEach(([key, change]) => {
+    savePriceChange(change.svcName, change.subName, change.oldPrice, change.newPrice);
+    count++;
+  });
+  pendingPriceChanges = {};
+  const btn = $('save-prices-btn'); if (btn) btn.style.display = 'none';
+  renderHome();
+  toast('✅ ' + count + ' price change' + (count !== 1 ? 's' : '') + ' saved!');
+}
+
+// ══════════════════════════════════════
+// ADMIN SIDEBAR — add Employees link
+// ══════════════════════════════════════
+// Patch buildAdminNav to include Employees
+const _origBuildAdminNav = buildAdminNav;
+buildAdminNav = function() {
+  _origBuildAdminNav();
+  const nav = $('adminNav'); if (!nav) return;
+  // Add Employees entry if not present
+  if (!nav.querySelector('[data-emp]')) {
+    const sepDiv = nav.querySelector('.sb-sep:last-of-type');
+    const empLnk = document.createElement('div');
+    empLnk.className = 'sb-lnk';
+    empLnk.setAttribute('data-emp', '1');
+    empLnk.innerHTML = '<span class="sb-ic">👷</span> Employees';
+    empLnk.onclick = function() { apanel('employees', this); };
+    if (sepDiv) nav.insertBefore(empLnk, sepDiv.nextSibling); else nav.appendChild(empLnk);
+    // Also patch apanel for employees
+  }
+};
+
+// Patch apanel to handle employees
+const _origApanel = apanel;
+apanel = function(n, el) {
+  _origApanel(n, el);
+  if (n === 'employees') {
+    document.querySelectorAll('#adminPg .dpanel').forEach(p => p.classList.remove('on'));
+    $('ap-employees')?.classList.add('on');
+    if (el) { document.querySelectorAll('#adminNav .sb-lnk').forEach(l => l.classList.remove('on')); el.classList.add('on'); }
+    renderEmployees();
+  }
+};
+
+// ══════════════════════════════════════
+// MOBILE NAV for Admin — add Employees
+// ══════════════════════════════════════
+// Already handled via sidebar
+
+// ══════════════════════════════════════
+// INVOICE — add order date + dynamic QR
+// ══════════════════════════════════════
+const _origBuildInvoiceHTML = buildInvoiceHTML;
+buildInvoiceHTML = function(bk, amount, gst) {
+  const gstAmt = amount && gst ? Math.round(amount * gst / 100) : 0;
+  const total = amount ? (amount + gstAmt) : null;
+  const orderDate = bk.created ? bk.created.split(',')[0].trim() : bk.date;
+  const qrData = encodeURIComponent(JSON.stringify({ id: bk.id, svc: bk.svc, cust: bk.uname, date: bk.date, status: bk.status }));
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${qrData}`;
+  return `<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;max-width:700px;margin:0 auto;padding:2rem;}
+.inv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #f97316;padding-bottom:1rem;margin-bottom:1.5rem;}
+.inv-logo{font-size:1.6rem;font-weight:900;color:#111;}.inv-logo b{color:#f97316;}
+.inv-tag{font-size:.7rem;color:#f97316;font-weight:700;letter-spacing:.1em;}
+.inv-id{font-size:.85rem;color:#555;}
+.inv-table{width:100%;border-collapse:collapse;margin:1.2rem 0;}
+.inv-table th{background:#f97316;color:#fff;padding:.6rem .9rem;text-align:left;font-size:.82rem;}
+.inv-table td{border-bottom:1px solid #eee;padding:.6rem .9rem;font-size:.85rem;}
+.inv-table tr:last-child td{border-bottom:none;}
+.inv-total{background:#fff8f3;border:2px solid #f97316;border-radius:8px;padding:1rem 1.2rem;text-align:right;margin-top:1rem;}
+.inv-foot{margin-top:2rem;font-size:.72rem;color:#888;border-top:1px solid #eee;padding-top:.8rem;text-align:center;}
+.badge{background:#fef3c7;color:#d97706;padding:.15rem .5rem;border-radius:4px;font-size:.74rem;font-weight:700;}
+.qr-section{display:flex;align-items:flex-start;gap:1.2rem;margin-bottom:1.5rem;padding:1rem;background:#f9f9f9;border-radius:8px;}
+</style></head><body>
+<div class="inv-head">
+  <div><div class="inv-logo">Serve<b>Now</b></div><div class="inv-tag">ARIYALUR &amp; PERAMBALUR</div><div style="font-size:.75rem;color:#888;margin-top:.3rem;">support@servenow.in | +91 94XXX XXXXX</div></div>
+  <div style="text-align:right;">
+    <div style="font-size:1.1rem;font-weight:700;color:#f97316;">TAX INVOICE</div>
+    <div class="inv-id">Booking ID: <strong>${bk.id}</strong></div>
+    <div style="font-size:.78rem;color:#888;">Order Date: ${orderDate}</div>
+    <div style="font-size:.78rem;color:#888;">Service Date: ${bk.date}</div>
+    <div style="font-size:.78rem;color:#888;">Generated: ${fmtDT(new Date())}</div>
+  </div>
+</div>
+<div class="qr-section">
+  <img src="${qrUrl}" alt="Booking QR" style="width:100px;height:100px;border:2px solid #f97316;border-radius:8px;" onerror="this.style.display='none'">
+  <div>
+    <div style="font-weight:700;font-size:.85rem;margin-bottom:.3rem;">📱 Scan to Verify Booking</div>
+    <div style="font-size:.75rem;color:#555;line-height:1.6;">Scan this QR code to verify booking details.<br>Booking ID: <strong style="color:#f97316;">${bk.id}</strong></div>
+  </div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+  <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Bill To</div><div>${bk.uname}</div><div style="color:#555;font-size:.83rem;">${bk.uphone}</div><div style="color:#555;font-size:.83rem;">${bk.uemail || ''}</div></div>
+  <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Service Address</div><div style="font-size:.83rem;color:#555;">${bk.addr}</div>${bk.lmk ? `<div style="font-size:.8rem;color:#888;">Landmark: ${bk.lmk}</div>` : ''}</div>
+</div>
+<table class="inv-table">
+  <thead><tr><th>Service</th><th>Sub-Service</th><th>Order Date</th><th>Service Date &amp; Time</th><th>Base Amount</th></tr></thead>
+  <tbody><tr>
+    <td>${bk.svc}</td>
+    <td>${bk.sub}</td>
+    <td>${orderDate}</td>
+    <td>${bk.date} at ${bk.time}</td>
+    <td>${amount ? '₹' + amount.toLocaleString('en-IN') : '—'}</td>
+  </tr></tbody>
+</table>
+${amount ? `<div class="inv-total">
+  <div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;"><span>Sub-total:</span><span>₹${amount.toLocaleString('en-IN')}</span></div>
+  ${gst ? `<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;color:#d97706;"><span>GST (${gst}%):</span><span>₹${gstAmt.toLocaleString('en-IN')}</span></div>` : ''}
+  <div style="display:flex;justify-content:flex-end;gap:2rem;font-size:1rem;font-weight:700;border-top:1px solid #f97316;padding-top:.4rem;color:#f97316;"><span>TOTAL:</span><span>₹${total.toLocaleString('en-IN')}</span></div>
+</div>` : '<div style="background:#fff8f3;border:1px solid #f97316;border-radius:8px;padding:1rem;text-align:center;color:#d97706;font-size:.85rem;">Amount will be confirmed after service completion.</div>'}
+<div style="margin-top:1rem;"><span class="badge">Status: ${bk.status}</span></div>
+${bk.notes ? `<div style="margin-top:.8rem;font-size:.82rem;color:#555;"><strong>Notes:</strong> ${bk.notes}</div>` : ''}
+<div class="inv-foot">ServeNow | Ariyalur, Tamil Nadu 621704 | Perambalur, Tamil Nadu 621212<br>Thank you for choosing ServeNow! 🙏</div>
+</body></html>`;
+};
+
+// ══════════════════════════════════════
+// PRICE MANAGEMENT — enhanced with pending + save btn
+// ══════════════════════════════════════
+const _origRenderPriceMgmt = renderPriceMgmt;
+renderPriceMgmt = function() {
+  pendingPriceChanges = {};
+  const btn = $('save-prices-btn'); if (btn) btn.style.display = 'none';
+  $('price-mgmt-content').innerHTML = `
+  <p style="color:var(--mu);font-size:.84rem;margin-bottom:1.5rem;padding:0 .2rem;">Edit prices below. Changes highlight in orange — click <strong style="color:var(--gr);">💾 Save All Changes</strong> to apply and record history.</p>
+  ${SVCS.map(s => `<div class="tc" style="margin-bottom:1.2rem;">
+    <div class="tc-hdr"><h3>${s.em} ${s.name}</h3>
+      <span style="font-size:.75rem;color:var(--mu);">Base: <input type="text" value="${s.from}" id="pf-base-${s.id}" onchange="markPriceChange('${s.id}','from',this,'${s.name}','Base Price',this.defaultValue,this.value)" style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:.25rem .5rem;color:var(--acc);font-size:.78rem;font-weight:700;width:120px;outline:none;transition:.2s;"></span>
+    </div>
+    <div style="padding:.8rem;">
+      ${s.subs.map((sub, i) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .7rem;border-bottom:1px solid var(--bdr);gap:.5rem;">
+        <span style="font-size:.83rem;flex:1;">${sub.em} ${sub.name}</span>
+        <input type="text" value="${sub.price}" id="pf-sub-${s.id}-${i}" onchange="markPriceChange('${s.id}','sub',this,'${s.name}','${sub.name}',this.defaultValue,this.value,${i})" style="background:var(--s3);border:1px solid rgba(249,115,22,.3);border-radius:6px;padding:.3rem .6rem;color:var(--acc);font-size:.82rem;font-weight:700;width:130px;outline:none;text-align:right;transition:.2s;">
+      </div>`).join('')}
+    </div>
+  </div>`).join('')}`;
+};
+
+function markPriceChange(svcId, type, inputEl, svcName, subName, oldVal, newVal, subIdx) {
+  if (oldVal === newVal) return;
+  const key = svcId + '_' + type + '_' + (subIdx !== undefined ? subIdx : 'base');
+  pendingPriceChanges[key] = { svcId, type, svcName, subName, oldPrice: oldVal, newPrice: newVal, subIdx };
+  inputEl.style.borderColor = 'var(--acc)';
+  inputEl.style.boxShadow = '0 0 0 2px rgba(249,115,22,.2)';
+  const btn = $('save-prices-btn');
+  if (btn) btn.style.display = 'flex';
+  // Actually update in memory too
+  if (type === 'from') {
+    const s = SVCS.find(x => x.id === svcId); if (s) s.from = newVal;
+  } else if (type === 'sub' && subIdx !== undefined) {
+    const s = SVCS.find(x => x.id === svcId); if (s && s.subs[subIdx]) s.subs[subIdx].price = newVal;
+  }
+}
+
+// ══════════════════════════════════════
+// REVENUE — patch renderRevenueDash to use filter
+// ══════════════════════════════════════
+const _origRenderRevenueDash = renderRevenueDash;
+renderRevenueDash = function() {
+  const allBks = DB.bks().filter(b => b.status === 'completed' && b.totalAmount);
+  const bks = filterByPeriod(allBks, curRevFilt !== 'custom' ? curRevFilt : 'all').filter(b => {
+    if (curRevFilt !== 'custom') return true;
+    const fr = v('rev-from'), to = v('rev-to');
+    if (fr && b.date < fr) return false;
+    if (to && b.date > to) return false;
+    return true;
+  });
+  const totalRev = bks.reduce((a, b) => a + (b.grandTotal || b.totalAmount || 0), 0);
+  const totalGST = bks.reduce((a, b) => a + (b.gstAmount || 0), 0);
+  const svcRev = SVCS.map(s => {
+    const sb = bks.filter(b => b.svc === s.name);
+    const rev = sb.reduce((a, b) => a + (b.grandTotal || b.totalAmount || 0), 0);
+    return { ...s, rev, cnt: sb.length };
+  }).sort((a, b) => b.rev - a.rev);
+  const maxRev = Math.max(...svcRev.map(s => s.rev), 1);
+  const monthly = {};
+  bks.forEach(b => {
+    const mon = b.date ? b.date.substring(0, 7) : 'Unknown';
+    if (!monthly[mon]) monthly[mon] = { rev: 0, cnt: 0, gst: 0 };
+    monthly[mon].rev += (b.grandTotal || b.totalAmount || 0);
+    monthly[mon].cnt++; monthly[mon].gst += (b.gstAmount || 0);
+  });
+  const months = Object.keys(monthly).sort().slice(-6);
+  const periodLabels = { today: "Today's", yesterday: "Yesterday's", week: "This Week's", month: "This Month's", year: "This Year's", all: "All Time", custom: "Custom Range" };
+  $('rev-dash-content').innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.4rem;">
+    <div class="kpi" style="background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.05));border-color:rgba(249,115,22,.3);">
+      <div class="kpi-ic">💰</div><div class="kpi-n" style="color:var(--acc);">₹${totalRev.toLocaleString('en-IN')}</div><div class="kpi-l">${periodLabels[curRevFilt] || ''} Revenue</div>
+    </div>
+    <div class="kpi" style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.05));border-color:rgba(245,158,11,.3);">
+      <div class="kpi-ic">🧾</div><div class="kpi-n" style="color:var(--yl);">₹${totalGST.toLocaleString('en-IN')}</div><div class="kpi-l">GST Collected</div>
+    </div>
+    <div class="kpi" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05));border-color:rgba(16,185,129,.3);">
+      <div class="kpi-ic">✅</div><div class="kpi-n" style="color:var(--gr);">${bks.length}</div><div class="kpi-l">Completed Orders</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-bottom:1.4rem;" class="admin-charts-grid">
+    <div class="tc"><div class="tc-hdr"><h3>Revenue by Service</h3></div>
+      <div style="padding:1.1rem;">
+        ${svcRev.map(s => `<div style="margin-bottom:.9rem;">
+          <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.3rem;">
+            <span>${s.em} ${s.name} <span style="color:var(--mu);font-size:.7rem;">(${s.cnt} orders)</span></span>
+            <span style="color:var(--acc);font-weight:700;">₹${s.rev.toLocaleString('en-IN')}</span>
+          </div>
+          <div style="background:var(--s2);border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;width:${Math.round(s.rev / maxRev * 100)}%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:4px;transition:width .5s;"></div>
+          </div>
+        </div>`).join('')}
+        ${!svcRev.some(s => s.rev > 0) ? empBox('No revenue in this period.') : ''}
+      </div>
+    </div>
+    <div class="tc"><div class="tc-hdr"><h3>Monthly Breakdown</h3></div>
+      <div style="padding:1.1rem;">
+        ${months.length ? months.map(m => `<div style="margin-bottom:.9rem;">
+          <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.3rem;">
+            <span>${m}</span>
+            <div style="text-align:right;"><span style="color:var(--gr);font-weight:700;">₹${monthly[m].rev.toLocaleString('en-IN')}</span> <span style="color:var(--mu);font-size:.7rem;">(${monthly[m].cnt} orders)</span></div>
+          </div>
+          <div style="font-size:.7rem;color:var(--yl);">GST: ₹${monthly[m].gst.toLocaleString('en-IN')}</div>
+        </div>`).join('') : empBox('No monthly data in this period.')}
+      </div>
+    </div>
+  </div>
+  <div class="tc"><div class="tc-hdr"><h3>${periodLabels[curRevFilt] || ''} Completed Orders</h3></div>
+    <div>${bks.map(b => `<div class="br">
+      <div>
+        <div class="br-svc">${b.svc}</div><div class="br-sub">${b.sub}</div>
+        <div class="br-meta">👤 ${b.uname} | 📅 ${b.date}</div>
+        <div class="br-id">${b.id} • Completed: ${b.completedOn || b.lastModified}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:900;color:var(--gr);">₹${(b.grandTotal || b.totalAmount || 0).toLocaleString('en-IN')}</div>
+        ${b.gstAmount ? `<div style="font-size:.72rem;color:var(--yl);">GST: ₹${b.gstAmount.toLocaleString('en-IN')}</div>` : ''}
+        <button class="abt" style="font-size:.74rem;margin-top:.4rem;" onclick="downloadInvoice('${b.id}')">⬇ Invoice</button>
+      </div>
+    </div>`).join('') || empBox('No completed orders in this period.')}
+    </div>
+  </div>`;
+};
+
+// ══════════════════════════════════════
+// MOBILE NAV — add employee portal
+// ══════════════════════════════════════
+
+// On logout, also clear employee state
+const _origDoLogout = doLogout;
+doLogout = function() {
+  CUR_EMP = null;
+  _origDoLogout();
+};
+
+</script>
 <style>
 :root{
   --bg:#05050a;--s1:#0c0c14;--s2:#12121e;--s3:#181828;--s4:#1e1e32;
@@ -116,7 +749,7 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .auth-logo b{color:var(--acc);}
 .auth-city{text-align:center;color:var(--acc);font-size:.7rem;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-bottom:.25rem;}
 .auth-sub{text-align:center;color:var(--mu);font-size:.83rem;margin-bottom:1.6rem;}
-.atabs{display:flex;background:var(--s2);border-radius:10px;padding:3px;gap:3px;margin-bottom:1.5rem;}
+.atabs{display:flex;background:var(--s2);border-radius:10px;padding:3px;gap:3px;margin-bottom:1.5rem;flex-wrap:wrap;}
 .atab{flex:1;padding:.57rem;border:none;background:none;color:var(--mu);font-family:var(--fb);font-size:.82rem;font-weight:600;cursor:pointer;border-radius:8px;transition:.2s;}
 .atab.on{background:var(--acc);color:#fff;}
 .aform{display:none;}.aform.on{display:block;}
@@ -570,6 +1203,15 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
   <button class="mob-nav-btn" onclick="doLogout()" style="color:var(--rd);"><span class="mni">🚪</span>Logout</button>
 </div>
 
+<!-- Mobile bottom nav (employee) -->
+<div class="mob-nav" id="empMobNav" style="display:none;">
+  <button class="mob-nav-btn on" onclick="epanel('overview',this)"><span class="mni">🏠</span>Home</button>
+  <button class="mob-nav-btn" onclick="epanel('mytasks',this)"><span class="mni">📋</span>Tasks</button>
+  <button class="mob-nav-btn" onclick="epanel('completed',this)"><span class="mni">🏆</span>Done</button>
+  <button class="mob-nav-btn" onclick="epanel('profile',this)"><span class="mni">👤</span>Profile</button>
+  <button class="mob-nav-btn" onclick="doLogout()" style="color:var(--rd);"><span class="mni">🚪</span>Logout</button>
+</div>
+
 <!-- ██ AUTH ██ -->
 <div id="authPg" class="pg">
   <div class="auth-bg"></div>
@@ -581,6 +1223,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <button class="atab on" onclick="atab('login')">Sign In</button>
       <button class="atab" onclick="atab('reg')">Register</button>
       <button class="atab" onclick="atab('admin')">Admin</button>
+      <button class="atab" onclick="atab('employee')">Employee</button>
     </div>
     <div class="aform on" id="af-login">
       <div class="fg"><label>Email</label><input type="email" id="li-em" placeholder="you@email.com"></div>
@@ -610,6 +1253,12 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <div class="fg"><label>Password</label><input type="password" id="ad-pw" placeholder="admin123"></div>
       <button class="abtn" onclick="doAdminLogin()">Access Dashboard →</button>
       <p class="asw" style="display:flex;justify-content:space-between;gap:.5rem;"><a onclick="openRecoveryModal('password')">Forgot password?</a><a onclick="openRecoveryModal('username')">Forgot username?</a></p>
+    </div>
+    <div class="aform" id="af-employee">
+      <div class="ahint">Login with your employee credentials provided by admin.</div>
+      <div class="fg"><label>Employee ID / Email</label><input type="text" id="emp-li-id" placeholder="e.g. EMP001 or emp@servenow.in"></div>
+      <div class="fg"><label>Password</label><input type="password" id="emp-li-pw" placeholder="Your password"></div>
+      <button class="abtn" onclick="doEmployeeLogin()" style="background:var(--bl);">Employee Login →</button>
     </div>
     <div class="aback"><a onclick="goHome()">← Back to ServeNow</a></div>
   </div>
@@ -872,14 +1521,18 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <div class="dpanel" id="ap-bookings">
         <div class="dm-hdr"><div><h1>All Bookings</h1><p>Filter, manage &amp; export</p></div></div>
         <div class="tc">
-          <div class="tc-hdr"><h3 id="a-bk-cnt">All Bookings</h3>
-            <div class="ftabs">
-              <button class="ftab on" onclick="aFilt('all',this)">All</button>
-              <button class="ftab" onclick="aFilt('pending',this)">Pending</button>
-              <button class="ftab" onclick="aFilt('confirmed',this)">Confirmed</button>
-              <button class="ftab" onclick="aFilt('inprogress',this)">In Progress</button>
-              <button class="ftab" onclick="aFilt('completed',this)">Completed</button>
-              <button class="ftab" onclick="aFilt('cancelled',this)">Cancelled</button>
+          <div class="tc-hdr" style="flex-wrap:wrap;gap:.65rem;">
+            <h3 id="a-bk-cnt">All Bookings</h3>
+            <div style="display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;flex:1;justify-content:space-between;">
+              <div class="ftabs">
+                <button class="ftab on" onclick="aFilt('all',this)">All</button>
+                <button class="ftab" onclick="aFilt('pending',this)">Pending</button>
+                <button class="ftab" onclick="aFilt('confirmed',this)">Confirmed</button>
+                <button class="ftab" onclick="aFilt('inprogress',this)">In Progress</button>
+                <button class="ftab" onclick="aFilt('completed',this)">Completed</button>
+                <button class="ftab" onclick="aFilt('cancelled',this)">Cancelled</button>
+              </div>
+              <button class="export-btn" onclick="exportFiltered()" style="margin-left:0;flex-shrink:0;">⬇ Export Excel</button>
             </div>
           </div>
           <div class="date-bar">
@@ -896,7 +1549,6 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
             <span class="dbar-label">To:</span>
             <input type="date" class="dbar-inp" id="df-to" onchange="setDFilt('custom',null)">
             <button class="dbar-btn" id="clearFiltBtn" onclick="clearAdminFilters()" style="color:var(--rd);border-color:rgba(239,68,68,.35);">✕ Clear Filters</button>
-            <button class="export-btn" onclick="exportFiltered()">⬇ Export Excel</button>
           </div>
           <div id="a-bk-list"></div>
         </div>
@@ -943,22 +1595,71 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
         <div class="dm-hdr"><div><h1>💰 Revenue Dashboard</h1><p>Earnings analysis by service, period &amp; category</p></div>
           <button class="export-btn" onclick="exportRevenue()">⬇ Export Revenue</button>
         </div>
+        <div class="tc" style="margin-bottom:1.2rem;">
+          <div class="tc-hdr" style="flex-wrap:wrap;gap:.5rem;">
+            <h3>Filter by Period</h3>
+            <div style="display:flex;align-items:center;gap:.4rem;flex-wrap:wrap;">
+              <button class="dbar-btn on" id="rev-filt-today" onclick="setRevFilt('today',this)">Today</button>
+              <button class="dbar-btn" id="rev-filt-yesterday" onclick="setRevFilt('yesterday',this)">Yesterday</button>
+              <button class="dbar-btn" id="rev-filt-week" onclick="setRevFilt('week',this)">This Week</button>
+              <button class="dbar-btn" id="rev-filt-month" onclick="setRevFilt('month',this)">This Month</button>
+              <button class="dbar-btn" id="rev-filt-year" onclick="setRevFilt('year',this)">This Year</button>
+              <button class="dbar-btn" id="rev-filt-all" onclick="setRevFilt('all',this)">All Time</button>
+              <div class="dbar-sep"></div>
+              <span class="dbar-label">From:</span>
+              <input type="date" class="dbar-inp" id="rev-from" onchange="setRevFilt('custom',null)">
+              <span class="dbar-label">To:</span>
+              <input type="date" class="dbar-inp" id="rev-to" onchange="setRevFilt('custom',null)">
+            </div>
+          </div>
+        </div>
         <div id="rev-dash-content"></div>
       </div>
       <!-- PRICE MANAGEMENT -->
       <div class="dpanel" id="ap-prices">
-        <div class="dm-hdr"><div><h1>💲 Price Management</h1><p>Update prices for all service categories</p></div></div>
-        <div id="price-mgmt-content"></div>
+        <div class="dm-hdr"><div><h1>💲 Price Management</h1><p>Update prices for all service categories</p></div>
+          <button class="export-btn" id="save-prices-btn" style="background:var(--gr);display:none;" onclick="saveAllPrices()">💾 Save All Changes</button>
+        </div>
+        <div class="tc" style="margin-bottom:1.2rem;">
+          <div class="tc-hdr">
+            <div class="ftabs">
+              <button class="ftab on" id="price-tab-manage" onclick="showPriceTab('manage',this)">📝 Manage Prices</button>
+              <button class="ftab" id="price-tab-history" onclick="showPriceTab('history',this)">📜 Pricing History</button>
+            </div>
+          </div>
+        </div>
+        <div id="price-manage-tab"><div id="price-mgmt-content"></div></div>
+        <div id="price-history-tab" style="display:none;">
+          <div class="tc"><div class="tc-hdr"><h3>Price Change History</h3>
+            <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="clearPriceHistory()">🗑️ Clear History</button>
+          </div><div id="price-history-list"></div></div>
+        </div>
       </div>
       <!-- SERVICES -->
       <div class="dpanel" id="ap-services">
-        <div class="dm-hdr"><div><h1>Service Catalogue</h1><p>All services and stats</p></div></div>
+        <div class="dm-hdr">
+          <div><h1>Service Catalogue</h1><p>All services and stats</p></div>
+          <button class="export-btn" style="background:var(--acc);display:flex;align-items:center;gap:.45rem;" onclick="openAddServiceModal()">＋ Add New Service</button>
+        </div>
         <div class="svc-grid" id="a-svc-grid"></div>
       </div>
       <!-- NOTIFICATIONS LOG -->
       <div class="dpanel" id="ap-notifications">
         <div class="dm-hdr"><div><h1>Notifications Sent</h1><p>WhatsApp, Email &amp; SMS log</p></div></div>
         <div class="tc"><div class="tc-hdr"><h3>Notification History</h3></div><div id="a-notif-list"></div></div>
+      </div>
+      <!-- EMPLOYEES TAB -->
+      <div class="dpanel" id="ap-employees">
+        <div class="dm-hdr">
+          <div><h1>👷 Employees</h1><p>Manage your team and assign bookings</p></div>
+          <button class="export-btn" style="background:var(--acc);" onclick="openAddEmployeeModal()">＋ Add Employee</button>
+        </div>
+        <div class="tc" style="margin-bottom:1.2rem;">
+          <div class="tc-hdr"><h3 id="emp-cnt">All Employees</h3>
+            <input type="text" id="emp-search" placeholder="🔍 Search by name or skill…" oninput="renderEmployees()" style="background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.38rem .85rem;color:var(--tx);font-size:.82rem;outline:none;min-width:200px;">
+          </div>
+          <div id="emp-list"></div>
+        </div>
       </div>
       <!-- PER-SERVICE BOOKING PANELS (ac, construct, cab, elec, sand, clean) -->
       <div class="dpanel" id="ap-svc-ac"><div class="dm-hdr"><div><h1>❄️ AC Service Bookings</h1></div></div><div id="list-svc-ac"></div></div>
@@ -967,6 +1668,64 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <div class="dpanel" id="ap-svc-elec"><div class="dm-hdr"><div><h1>⚡ Electrical Bookings</h1></div></div><div id="list-svc-elec"></div></div>
       <div class="dpanel" id="ap-svc-sand"><div class="dm-hdr"><div><h1>🪨 Sand Supply Bookings</h1></div></div><div id="list-svc-sand"></div></div>
       <div class="dpanel" id="ap-svc-clean"><div class="dm-hdr"><div><h1>✨ Home Cleaning Bookings</h1></div></div><div id="list-svc-clean"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ██ EMPLOYEE DASHBOARD ██ -->
+<div id="empPg" class="pg">
+  <div class="dash-lay">
+    <div class="sidebar" id="empSidebar">
+      <div class="sb-head"><div class="sb-logo">Serve<b>Now</b></div><div class="sb-city" style="color:var(--bl);">Employee Portal</div></div>
+      <div class="sb-user">
+        <div class="sb-av" style="background:linear-gradient(135deg,var(--bl),#60a5fa);" id="emp-av">EM</div>
+        <div class="sb-nm" id="emp-name">Employee</div>
+        <div class="sb-role" id="emp-role" style="color:var(--bl);">Field Staff</div>
+      </div>
+      <div class="sb-nav">
+        <div class="sb-lnk on" onclick="epanel('overview',this)"><span class="sb-ic">🏠</span> Overview</div>
+        <div class="sb-lnk" onclick="epanel('mytasks',this)"><span class="sb-ic">📋</span> My Tasks <span class="sb-badge" id="emp-task-badge" style="display:none;">0</span></div>
+        <div class="sb-lnk" onclick="epanel('completed',this)"><span class="sb-ic">🏆</span> Completed</div>
+        <div class="sb-lnk" onclick="epanel('profile',this)"><span class="sb-ic">👤</span> My Profile</div>
+      </div>
+      <div class="sb-out"><button class="out-btn" onclick="doLogout()">Sign Out</button></div>
+    </div>
+    <div class="dmain">
+      <div class="dpanel on" id="ep-overview">
+        <div class="dm-hdr"><div><h1 id="emp-welcome">Welcome!</h1><p>Your work dashboard</p></div></div>
+        <div class="kpi-row" id="emp-kpis"></div>
+        <div class="tc"><div class="tc-hdr"><h3>Today's Assignments</h3></div><div id="emp-today-tasks"></div></div>
+      </div>
+      <div class="dpanel" id="ep-mytasks">
+        <div class="dm-hdr"><div><h1>My Tasks</h1><p>All assigned bookings</p></div></div>
+        <div class="tc">
+          <div class="tc-hdr"><h3>Assigned Bookings</h3>
+            <div class="ftabs">
+              <button class="ftab on" onclick="empTaskFilt('all',this)">All</button>
+              <button class="ftab" onclick="empTaskFilt('confirmed',this)">To Do</button>
+              <button class="ftab" onclick="empTaskFilt('inprogress',this)">In Progress</button>
+              <button class="ftab" onclick="empTaskFilt('completed',this)">Done</button>
+            </div>
+          </div>
+          <div id="emp-tasks-list"></div>
+        </div>
+      </div>
+      <div class="dpanel" id="ep-completed">
+        <div class="dm-hdr"><div><h1>Completed Work</h1><p>Your finished jobs</p></div></div>
+        <div class="tc"><div class="tc-hdr"><h3>Completed Jobs</h3></div><div id="emp-done-list"></div></div>
+      </div>
+      <div class="dpanel" id="ep-profile">
+        <div class="dm-hdr"><div><h1>My Profile</h1></div></div>
+        <div class="prof-card" style="max-width:420px;">
+          <div style="font-size:3rem;margin-bottom:.8rem;" id="emp-pf-av">👷</div>
+          <div class="fg"><label>Name</label><input type="text" id="emp-pf-name" readonly style="opacity:.7;"></div>
+          <div class="fg"><label>Employee ID</label><input type="text" id="emp-pf-id" readonly style="opacity:.7;"></div>
+          <div class="fg"><label>Role / Skill</label><input type="text" id="emp-pf-role" readonly style="opacity:.7;"></div>
+          <div class="fg"><label>Phone</label><input type="text" id="emp-pf-phone" readonly style="opacity:.7;"></div>
+          <div class="fg"><label>Change Password</label><input type="password" id="emp-pf-newpw" placeholder="Enter new password"></div>
+          <button class="f-sub" style="background:var(--bl);" onclick="empChangePwd()">Update Password</button>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -1399,15 +2158,17 @@ const _origSelSubFn=window.selSubFn;
 // MOBILE NAV VISIBILITY
 // ══════════════════════════════════════
 function showMobNav(type){
-  // Only show mobile nav on small screens
   const isMob=window.innerWidth<=768;
   const custNav=document.getElementById('custMobNav');
   const adminNav=document.getElementById('adminMobNav');
+  const empNav=document.getElementById('empMobNav');
   custNav.style.display='none';
   adminNav.style.display='none';
+  if(empNav) empNav.style.display='none';
   if(isMob){
     if(type==='cust') custNav.style.display='flex';
     if(type==='admin') adminNav.style.display='flex';
+    if(type==='employee'&&empNav) empNav.style.display='flex';
   }
 }
 // Re-evaluate mobile nav on resize
@@ -1419,6 +2180,7 @@ window.addEventListener('resize',function(){
 function hideMobNavs(){
   document.getElementById('custMobNav').style.display='none';
   document.getElementById('adminMobNav').style.display='none';
+  const en=document.getElementById('empMobNav');if(en)en.style.display='none';
 }
 
 // ══════════════════════════════════════
@@ -1450,7 +2212,8 @@ function updateNavForUser(){
 // AUTH
 // ══════════════════════════════════════
 function atab(t){
-  document.querySelectorAll('.atab').forEach((el,i)=>el.classList.toggle('on',['login','reg','admin'][i]===t));
+  const tabs=['login','reg','admin','employee'];
+  document.querySelectorAll('.atab').forEach((el,i)=>el.classList.toggle('on',tabs[i]===t));
   document.querySelectorAll('.aform').forEach(f=>f.classList.remove('on'));
   $('af-'+t).classList.add('on');
 }
@@ -2148,7 +2911,7 @@ function apanel(n,el){
   if(n==='reviews') renderAdminReviews();
   if(n==='notifications') renderAdminNotifs();
   if(n==='services') renderAdminSvcs();
-  if(n==='revenue') renderRevenueDash();
+  if(n==='revenue'){renderRevenueDash();}
   if(n==='prices') renderPriceMgmt();
   SVCS.forEach(s=>{if(n==='svc-'+s.id) renderSvcPanel(s.id,s.name);});
 }
@@ -2934,7 +3697,7 @@ function goInner(page){
   else if(page==='privacy')el.innerHTML=buildPrivacy();
   else if(page==='terms')el.innerHTML=buildTerms();
 }
-function buildAbout(){return`<div class="inner-pg"><div class="back-btn" onclick="goHome()">← Back</div><div class="stag">✦ About Us</div><h1>About ServeNow</h1><p class="lead">ServeNow is Ariyalur and Perambalur's first all-in-one home services platform — bringing verified professionals to your doorstep in minutes.</p><div class="inner-sec"><h2>Our Mission</h2><p>We started ServeNow to make reliable home services accessible to every household in Ariyalur and Perambalur districts. Finding a trustworthy electrician, AC technician, or contractor used to mean making dozens of calls. We changed that.</p><p>Today, ServeNow connects hundreds of households with trained, verified, and rated service professionals — all bookable in under 2 minutes, all trackable in real time.</p><h2>Our Values</h2><div class="val-grid"><div class="val-card"><div class="val-ic">🤝</div><div class="val-nm">Trust</div><div class="val-desc">Every professional is background-verified and rated by real customers.</div></div><div class="val-card"><div class="val-ic">⚡</div><div class="val-nm">Speed</div><div class="val-desc">Most services confirmed within 1 hour. Same-day availability.</div></div><div class="val-card"><div class="val-ic">💰</div><div class="val-nm">Transparency</div><div class="val-desc">All prices shown upfront. No hidden charges.</div></div><div class="val-card"><div class="val-ic">🌱</div><div class="val-nm">Local First</div><div class="val-desc">We prioritise local professionals from Ariyalur and Perambalur.</div></div></div><h2>Services</h2><ul><li><strong>AC Service</strong> — Repair, installation, gas filling, deep cleaning and AMC.</li><li><strong>Construction</strong> — Home building, renovation, flooring, painting, waterproofing and interior design.</li><li><strong>Cab Service</strong> — City rides, airport transfers, outstation trips and hourly rentals.</li><li><strong>Electrical</strong> — Wiring, fan/light installation, MCB panels, CCTV and home automation.</li><li><strong>Sand Supply</strong> — M-Sand, River Sand, P-Sand, Jelly, Red Soil and Quarry Dust.</li><li><strong>Home Cleaning</strong> — Deep cleaning, sofa cleaning, post-construction cleanup and maid service.</li></ul><h2>The Team</h2><div class="team-grid"><div class="team-card"><div class="team-av">SK</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Senthilkumar R.</div><div style="color:var(--mu);font-size:.78rem;">Founder &amp; CEO</div></div><div class="team-card"><div class="team-av">MV</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Muthuvignesh P.</div><div style="color:var(--mu);font-size:.78rem;">Operations Head</div></div><div class="team-card"><div class="team-av">KA</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Kavitha A.</div><div style="color:var(--mu);font-size:.78rem;">Customer Relations</div></div><div class="team-card"><div class="team-av">RB</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Rajesh B.</div><div style="color:var(--mu);font-size:.78rem;">Tech Lead</div></div></div><h2>Contact</h2><p>📍 Head Office: Ariyalur, Tamil Nadu 621704</p><p>📍 Branch: Perambalur, Tamil Nadu 621212</p><p>📞 +91 94XXX XXXXX &nbsp;|&nbsp; 📧 support@servenow.in</p><p>🕐 Mon–Sat: 7 AM – 9 PM</p></div></div>`;}
+function buildAbout(){return`<div class="inner-pg"><div class="back-btn" onclick="goHome()">← Back</div><div class="stag">✦ About Us</div><h1>About ServeNow</h1><p class="lead">ServeNow is Ariyalur and Perambalur's first all-in-one home services platform — bringing verified professionals to your doorstep in minutes.</p><div class="inner-sec"><h2>Our Mission</h2><p>We started ServeNow to make reliable home services accessible to every household in Ariyalur and Perambalur districts. Finding a trustworthy electrician, AC technician, or contractor used to mean making dozens of calls. We changed that.</p><p>Today, ServeNow connects hundreds of households with trained, verified, and rated service professionals — all bookable in under 2 minutes, all trackable in real time.</p><h2>Our Values</h2><div class="val-grid"><div class="val-card"><div class="val-ic">🤝</div><div class="val-nm">Trust</div><div class="val-desc">Every professional is background-verified and rated by real customers.</div></div><div class="val-card"><div class="val-ic">⚡</div><div class="val-nm">Speed</div><div class="val-desc">Most services confirmed within 1 hour. Same-day availability.</div></div><div class="val-card"><div class="val-ic">💰</div><div class="val-nm">Transparency</div><div class="val-desc">All prices shown upfront. No hidden charges.</div></div><div class="val-card"><div class="val-ic">🌱</div><div class="val-nm">Local First</div><div class="val-desc">We prioritise local professionals from Ariyalur and Perambalur.</div></div></div><h2>Services</h2><ul><li><strong>AC Service</strong> — Repair, installation, gas filling, deep cleaning and AMC.</li><li><strong>Construction</strong> — Home building, renovation, flooring, painting, waterproofing and interior design.</li><li><strong>Cab Service</strong> — City rides, airport transfers, outstation trips and hourly rentals.</li><li><strong>Electrical</strong> — Wiring, fan/light installation, MCB panels, CCTV and home automation.</li><li><strong>Sand Supply</strong> — M-Sand, River Sand, P-Sand, Jelly, Red Soil and Quarry Dust.</li><li><strong>Home Cleaning</strong> — Deep cleaning, sofa cleaning, post-construction cleanup and maid service.</li></ul><h2>The Team</h2><div class="team-grid"><div class="team-card"><div class="team-av">RR</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Rajkumar R.</div><div style="color:var(--mu);font-size:.78rem;">Founder &amp; CEO</div></div><div class="team-card"><div class="team-av">KR</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Karthik R.</div><div style="color:var(--mu);font-size:.78rem;">Operations Head</div></div><div class="team-card"><div class="team-av">KA</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Kavitha A.</div><div style="color:var(--mu);font-size:.78rem;">Customer Relations</div></div><div class="team-card"><div class="team-av">RB</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Rajesh B.</div><div style="color:var(--mu);font-size:.78rem;">Tech Lead</div></div></div><h2>Contact</h2><p>📍 Head Office: Ariyalur, Tamil Nadu 621704</p><p>📍 Branch: Perambalur, Tamil Nadu 621212</p><p>📞 +91 94XXX XXXXX &nbsp;|&nbsp; 📧 support@servenow.in</p><p>🕐 Mon–Sat: 7 AM – 9 PM</p></div></div>`;}
 function buildPrivacy(){return`<div class="inner-pg"><div class="back-btn" onclick="goHome()">← Back</div><div class="stag">✦ Privacy Policy</div><h1>Privacy Policy</h1><p class="lead">ServeNow is committed to protecting your privacy. This policy explains how we collect, use and safeguard your personal information.</p><div class="inner-sec"><p><em>Last updated: June 2026</em></p><h2>1. Information We Collect</h2><h3>Account Information</h3><p>Name, email, phone number and password when you register.</p><h3>Booking Information</h3><p>Service address, landmark, date, time and additional notes. For cab bookings, pickup and drop locations.</p><h3>Location Data</h3><p>With your explicit permission via GPS button. Never tracked in the background.</p><h2>2. How We Use Your Information</h2><ul><li>To create and manage your account</li><li>To process and confirm service bookings</li><li>To dispatch verified professionals to your location</li><li>To send WhatsApp, SMS and email confirmations and updates</li><li>To improve our services</li><li>To respond to support requests</li></ul><h2>3. WhatsApp & SMS Notifications</h2><p>By providing your phone number, you consent to receiving WhatsApp messages and SMS notifications for booking confirmations, status updates and promotional offers from ServeNow. You can opt out at any time by contacting support@servenow.in.</p><h2>4. Data Sharing</h2><p>We share your booking details with the assigned professional. We do not sell or rent your data. Trusted partners assisting platform operations operate under strict confidentiality.</p><h2>5. Your Rights</h2><ul><li>Access and correct your data in the Profile section</li><li>Request account deletion via support@servenow.in</li><li>Opt out of promotional communications</li></ul><h2>6. Contact</h2><p>privacy@servenow.in | Ariyalur, Tamil Nadu 621704</p></div></div>`;}
 function buildTerms(){return`<div class="inner-pg"><div class="back-btn" onclick="goHome()">← Back</div><div class="stag">✦ Terms of Service</div><h1>Terms of Service</h1><p class="lead">By using ServeNow, you agree to these terms. Please read carefully before booking.</p><div class="inner-sec"><p><em>Last updated: June 2026</em></p><h2>1. Acceptance</h2><p>By registering or using ServeNow, you confirm you are 18+ and agree to these terms.</p><h2>2. Services</h2><p>ServeNow connects customers in Ariyalur and Perambalur with verified local professionals. We facilitate bookings but are not directly responsible for work quality.</p><h2>3. Bookings & Cancellations</h2><ul><li>Confirmed subject to professional availability</li><li>Cancellations 4+ hours before: No charge</li><li>Cancellations within 4 hours: Fee may apply</li><li>No-shows may incur a penalty</li></ul><h2>4. Notifications Consent</h2><p>By registering, you consent to receiving WhatsApp messages, SMS and email notifications related to your bookings and account. This includes booking confirmations, status updates and service reminders.</p><h2>5. User Responsibilities</h2><ul><li>Provide accurate booking information including mandatory landmark</li><li>Ensure access for the professional</li><li>Treat service professionals with respect</li></ul><h2>6. Governing Law</h2><p>These terms are governed by the laws of India. Disputes subject to jurisdiction of courts in Ariyalur, Tamil Nadu.</p><h2>7. Contact</h2><p>legal@servenow.in | Ariyalur, Tamil Nadu 621704</p></div></div>`;}
 
