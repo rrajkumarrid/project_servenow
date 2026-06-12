@@ -555,8 +555,9 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
   <button class="mob-nav-btn on" onclick="cpanel('overview',this)" data-panel="overview"><span class="mni">🏠</span>Home</button>
   <button class="mob-nav-btn" onclick="cpanel('book',this)" data-panel="book"><span class="mni">➕</span>Book</button>
   <button class="mob-nav-btn" onclick="cpanel('orders',this)" data-panel="orders"><span class="mni">📋</span>Orders</button>
-  <button class="mob-nav-btn" onclick="cpanel('track',this)" data-panel="track"><span class="mni">🔍</span>Track</button>
+  <button class="mob-nav-btn" onclick="cpanel('notifications',this)" data-panel="notifications"><span class="mni">🔔</span>Alerts<span class="mob-notif-badge" id="mob-notif-badge" style="display:none;background:var(--rd);color:#fff;border-radius:50%;width:16px;height:16px;font-size:.6rem;display:none;align-items:center;justify-content:center;position:absolute;top:2px;right:18px;"></span></button>
   <button class="mob-nav-btn" onclick="cpanel('profile',this)" data-panel="profile"><span class="mni">👤</span>Me</button>
+  <button class="mob-nav-btn" onclick="doLogout()" style="color:var(--rd);"><span class="mni">🚪</span>Logout</button>
 </div>
 
 <!-- Mobile bottom nav (admin) -->
@@ -564,8 +565,9 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
   <button class="mob-nav-btn on" onclick="apanel('dash',this)"><span class="mni">📊</span>Dash</button>
   <button class="mob-nav-btn" onclick="apanel('bookings',this)"><span class="mni">📋</span>Bookings<span class="mob-nav-badge" id="mob-pending-badge" style="display:none;"></span></button>
   <button class="mob-nav-btn" onclick="apanel('customers',this)"><span class="mni">👥</span>Users</button>
-  <button class="mob-nav-btn" onclick="apanel('notifications',this)"><span class="mni">🔔</span>Notifs</button>
-  <button class="mob-nav-btn" onclick="apanel('services',this)"><span class="mni">🛠️</span>Services</button>
+  <button class="mob-nav-btn" onclick="apanel('revenue',this)"><span class="mni">💰</span>Revenue</button>
+  <button class="mob-nav-btn" onclick="apanel('reviews',this)"><span class="mni">⭐</span>Reviews</button>
+  <button class="mob-nav-btn" onclick="doLogout()" style="color:var(--rd);"><span class="mni">🚪</span>Logout</button>
 </div>
 
 <!-- ██ AUTH ██ -->
@@ -690,6 +692,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
         <h3 style="font-family:var(--fh);font-weight:700;font-size:1.05rem;margin-bottom:1.2rem;">Send a Message</h3>
         <div class="fg"><label>Name</label><input type="text" id="c-nm" placeholder="Murugan Kumar"></div>
         <div class="fg"><label>Email</label><input type="email" id="c-em" placeholder="you@email.com"></div>
+        <div class="fg"><label>Phone <span style="color:var(--rd);font-weight:700;">* Required</span></label><input type="tel" id="c-ph" placeholder="+91 94XXX XXXXX"></div>
         <div class="fg"><label>Message</label><textarea id="c-mg" placeholder="How can we help?"></textarea></div>
         <button class="f-sub" onclick="sendContact()">Send Message →</button>
       </div>
@@ -801,7 +804,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       </div>
       <div class="dpanel" id="cp-notifications">
         <div class="dm-hdr"><div><h1>Notifications</h1><p>Your alerts and messages</p></div></div>
-        <div class="tc"><div class="tc-hdr"><h3>Notification Log</h3></div><div id="c-notif-list"></div></div>
+        <div class="tc"><div class="tc-hdr"><h3>Notification Log</h3><span id="c-unread-label" style="font-size:.76rem;color:var(--acc);font-weight:700;"></span></div><div id="c-notif-list"></div></div>
       </div>
       <div class="dpanel" id="cp-profile">
         <div class="dm-hdr"><div><h1>My Profile</h1><p>Manage your account</p></div></div>
@@ -812,6 +815,13 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
           <div class="fg"><label>Phone (WhatsApp &amp; SMS)</label><input type="tel" id="pf-ph"></div>
           <div class="fg"><label>Default Address</label><input type="text" id="pf-ad" placeholder="Your address in Ariyalur / Perambalur"></div>
           <button class="f-sub" onclick="savePrf()">Save Changes</button>
+        </div>
+        <div class="prof-card" style="margin-top:1.2rem;">
+          <h3 style="font-family:var(--fh);font-weight:700;font-size:1rem;margin-bottom:1rem;">🔒 Change Password</h3>
+          <div class="fg"><label>Current Password</label><input type="password" id="pf-cpw" placeholder="Your current password"></div>
+          <div class="fg"><label>New Password</label><input type="password" id="pf-npw" placeholder="Min 6 characters"></div>
+          <div class="fg"><label>Confirm New Password</label><input type="password" id="pf-cnpw" placeholder="Repeat new password"></div>
+          <button class="f-sub" onclick="changePwd()" style="background:var(--bl);">Change Password</button>
         </div>
       </div>
     </div>
@@ -896,17 +906,49 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
         <div class="dm-hdr"><div><h1>Customers</h1><p>Full details of all registered users</p></div>
           <button class="export-btn" onclick="exportCustomers()">⬇ Export Excel</button>
         </div>
-        <div class="tc"><div class="tc-hdr"><h3 id="a-cu-cnt">All Customers</h3></div><div id="a-cu-list"></div></div>
+        <div class="tc">
+          <div class="tc-hdr"><h3 id="a-cu-cnt">All Customers</h3>
+            <input type="text" id="cu-search" placeholder="🔍 Search by name, email or phone…" oninput="renderAdminCusts()" style="background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.38rem .85rem;color:var(--tx);font-size:.82rem;outline:none;min-width:220px;">
+          </div>
+          <div id="a-cu-list"></div>
+        </div>
       </div>
       <!-- CONTACT MESSAGES -->
       <div class="dpanel" id="ap-contacts">
         <div class="dm-hdr"><div><h1>Contact Messages</h1><p>Messages submitted via the "Contact Us" form</p></div></div>
         <div class="tc"><div class="tc-hdr"><h3 id="a-ct-cnt">Messages</h3></div><div id="a-ct-list"></div></div>
       </div>
-      <!-- RATINGS & REVIEWS -->
+      <!-- RATINGS & REVIEWS — modern dashboard -->
       <div class="dpanel" id="ap-reviews">
-        <div class="dm-hdr"><div><h1>Ratings &amp; Reviews</h1><p>Customer feedback — choose which reviews appear on the home page</p></div></div>
-        <div class="tc"><div class="tc-hdr"><h3 id="a-rv-cnt">Reviews</h3></div><div id="a-rv-list"></div></div>
+        <div class="dm-hdr"><div><h1>Ratings &amp; Reviews</h1><p>Customer feedback — feature reviews on the home page</p></div></div>
+        <div class="tc" style="margin-bottom:1.2rem;">
+          <div class="tc-hdr"><h3 id="a-rv-cnt">Reviews</h3>
+            <div class="ftabs">
+              <button class="ftab on" onclick="rvFilt('all',this)">All</button>
+              <button class="ftab" onclick="rvFilt('featured',this)">⭐ Featured</button>
+              <button class="ftab" onclick="rvFilt('5',this)">5★</button>
+              <button class="ftab" onclick="rvFilt('4',this)">4★</button>
+              <button class="ftab" onclick="rvFilt('3',this)">3★ &amp; Below</button>
+            </div>
+          </div>
+          <div class="tc-hdr" style="padding:.5rem 1rem;border-bottom:1px solid var(--bdr);">
+            <span style="font-size:.78rem;color:var(--mu);">Filter by customer:</span>
+            <input type="text" id="rv-search" placeholder="Search by name or service…" oninput="renderAdminReviews()" style="background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.38rem .75rem;color:var(--tx);font-size:.82rem;outline:none;width:220px;">
+          </div>
+          <div id="a-rv-list"></div>
+        </div>
+      </div>
+      <!-- REVENUE DASHBOARD -->
+      <div class="dpanel" id="ap-revenue">
+        <div class="dm-hdr"><div><h1>💰 Revenue Dashboard</h1><p>Earnings analysis by service, period &amp; category</p></div>
+          <button class="export-btn" onclick="exportRevenue()">⬇ Export Revenue</button>
+        </div>
+        <div id="rev-dash-content"></div>
+      </div>
+      <!-- PRICE MANAGEMENT -->
+      <div class="dpanel" id="ap-prices">
+        <div class="dm-hdr"><div><h1>💲 Price Management</h1><p>Update prices for all service categories</p></div></div>
+        <div id="price-mgmt-content"></div>
       </div>
       <!-- SERVICES -->
       <div class="dpanel" id="ap-services">
@@ -1529,13 +1571,20 @@ function openWhatsApp(phone,msg){
 }
 
 function updateNotifBadges(){
-  const notifs=DB.notifs();
-  const unread=notifs.filter(n=>!n.read).length;
-  // Customer badge
+  const allNotifs=DB.notifs();
+  // For customer: only their own notifications
+  let myUnread=0;
+  if(CU){
+    const myNotifs=allNotifs.filter(n=>!n.bkId||DB.myBks(CU.email).some(b=>b.id===n.bkId));
+    myUnread=myNotifs.filter(n=>!n.read).length;
+  }
   const cb=$('c-notif-badge');
-  if(cb){cb.style.display=unread>0?'inline-block':'none';cb.textContent=Math.min(unread,99);}
-  // Admin sidebar badges
-  buildAdminNav();
+  if(cb){cb.style.display=myUnread>0?'inline-block':'none';cb.textContent=Math.min(myUnread,99);}
+  // Mobile notification badge
+  const mb=$('mob-notif-badge');
+  if(mb){mb.style.display=myUnread>0?'flex':'none';mb.textContent=Math.min(myUnread,99);}
+  // Admin sidebar
+  if(isAdmin) buildAdminNav();
 }
 
 // ══════════════════════════════════════
@@ -1549,9 +1598,13 @@ function renderHome(){
       <div class="svc-foot"><span class="svc-from">${s.from}</span><button class="svc-arr">→</button></div>
       <div class="svc-cnt">${s.subs.length} services available</div>
     </div>`).join('');
+  // Reviews: always show static seed reviews PLUS any featured DB reviews
   const featured=DB.reviews().filter(r=>r.featured);
-  const revSource=featured.length?featured.map(r=>({s:r.rating,t:r.text,n:r.uname,l:'',i:(r.uname||'U ?').trim().split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()})):REVIEWS;
-  $('homeRevGrid').innerHTML=revSource.map(r=>`
+  const allRevs=[
+    ...featured.map(r=>({s:r.rating,t:r.text,n:r.uname,l:'✅ Verified Customer',i:(r.uname||'U ?').trim().split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()})),
+    ...REVIEWS
+  ];
+  $('homeRevGrid').innerHTML=allRevs.map(r=>`
     <div class="rev-card">
       <div class="rev-stars">${Array(r.s).fill('<span class="rev-star">★</span>').join('')}${Array(5-r.s).fill('<span class="rev-star" style="opacity:.2">★</span>').join('')}</div>
       <p class="rev-txt">"${r.t}"</p>
@@ -1770,7 +1823,7 @@ function submitBk(){
   DB.addBk(bk);
   updateStats();
   sendNotification({type:'booking',to:em||'',phone:ph,name:nm,bkId:id,svc:s.name,sub,date,time,addr});
-  toast('✅ Booking confirmed! ID: '+id);
+  showBookingConfirmPopup(bk);
   if(ph){
     setTimeout(()=>{
       const waMsg=buildNotifMsg({name:nm,bkId:id,svc:s.name,sub,date,time,addr});
@@ -1852,7 +1905,19 @@ function renderCustOv(){
   const bk=DB.myBks(CU.email);
   const kpis=[{ic:'📋',n:bk.length,l:'Total'},{ic:'⏳',n:bk.filter(b=>b.status==='pending').length,l:'Pending'},{ic:'🔧',n:bk.filter(b=>b.status==='inprogress').length,l:'In Progress'},{ic:'🏆',n:bk.filter(b=>b.status==='completed').length,l:'Completed'}];
   $('c-kpis').innerHTML=kpis.map(k=>`<div class="kpi"><div class="kpi-ic">${k.ic}</div><div class="kpi-n">${k.n}</div><div class="kpi-l">${k.l}</div></div>`).join('');
-  $('c-recent').innerHTML=bk.slice(0,5).map(custRow).join('')||empBox('No bookings yet. Book your first service!');
+  // Service category breakdown
+  const svcCounts=SVCS.map(s=>({em:s.em,name:s.name,cnt:bk.filter(b=>b.svc===s.name).length})).filter(s=>s.cnt>0);
+  const svcHtml=svcCounts.length?`<div class="tc" style="margin-bottom:1.4rem;">
+    <div class="tc-hdr"><h3>My Orders by Service</h3></div>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;padding:1rem;">
+      ${svcCounts.map(s=>`<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:12px;padding:.8rem;text-align:center;cursor:pointer;" onclick="cpanel('orders',null);setTimeout(()=>{renderCustOrders('all');},50)">
+        <div style="font-size:1.5rem;">${s.em}</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:900;color:var(--acc);">${s.cnt}</div>
+        <div style="font-size:.65rem;color:var(--mu);">${s.name}</div>
+      </div>`).join('')}
+    </div>
+  </div>`:'';
+  $('c-recent').innerHTML=svcHtml+(bk.slice(0,5).map(custRow).join('')||empBox('No bookings yet. Book your first service!'));
 }
 function renderCustOrders(f){
   let bk=DB.myBks(CU.email);if(f!=='all')bk=bk.filter(b=>b.status===f);
@@ -1873,6 +1938,7 @@ function custRow(b){
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.45rem;">
       <span class="badge b-${b.status}">${b.status==='inprogress'?'In Progress':b.status}</span>
       <button class="abt" onclick="qTrack('${b.id}')">🔍 Track</button>
+      ${b.status==='completed'?`<button class="abt" style="color:var(--gr);border-color:rgba(16,185,129,.35);" onclick="custDownloadInvoice('${b.id}')">⬇ Invoice</button>`:''}
       ${reviewBtn}
     </div>
   </div>`;
@@ -1939,10 +2005,40 @@ function doTrack(resId,inId){
   $(resId).innerHTML=buildTrackHTML(DB.findBk(id));
 }
 function renderCustNotifs(){
-  const notifs=DB.notifs().filter(n=>!n.bkId||DB.myBks(CU.email).some(b=>b.id===n.bkId));
-  notifs.forEach(n=>n.read=true);
+  const all=DB.notifs();
+  const myNotifs=all.filter(n=>!n.bkId||DB.myBks(CU.email).some(b=>b.id===n.bkId));
+  const unread=myNotifs.filter(n=>!n.read);
+  const unreadLabel=$('c-unread-label');
+  if(unreadLabel) unreadLabel.textContent=unread.length>0?`${unread.length} unread`:'All read';
+  // Mark as read when panel opened
+  const notifIds=new Set(myNotifs.map(n=>n.id));
+  const updatedAll=all.map(n=>notifIds.has(n.id)?{...n,read:true}:n);
+  DB.s('notifications',updatedAll);
   updateNotifBadges();
-  $('c-notif-list').innerHTML=notifs.length?notifs.map(notifRow).join('')||empBox('No notifications yet.'):empBox('No notifications yet.');
+  $('c-notif-list').innerHTML=myNotifs.length?myNotifs.map((n,idx)=>custNotifRow(n,idx)).join(''):empBox('No notifications yet.');
+}
+function custNotifRow(n,idx){
+  const icons={whatsapp:'💬',email:'📧',sms:'📱',admin_email:'📧'};
+  const cls={whatsapp:'notif-wa',email:'notif-email',sms:'notif-sms',admin_email:'notif-email'};
+  const preview=n.msg.substring(0,80)+(n.msg.length>80?'…':'');
+  return`<div class="notif-item" style="${!n.read?'border-left:3px solid var(--acc);':''}" id="cnotif-${idx}">
+    <div class="notif-ic ${cls[n.channel]||'notif-sms'}">${icons[n.channel]||'📱'}</div>
+    <div style="flex:1;">
+      <div class="notif-txt"><strong>${(n.channel||'').toUpperCase()}</strong> ${n.bkId?'— '+n.bkId:''} ${!n.read?'<span style="background:var(--acc);color:#fff;font-size:.6rem;padding:.1rem .35rem;border-radius:4px;margin-left:.3rem;">NEW</span>':''}</div>
+      <div class="notif-txt" id="cnotif-msg-${idx}" style="margin-top:.2rem;white-space:pre-wrap;line-height:1.6;">${preview}</div>
+      ${n.msg.length>80?`<button onclick="toggleNotifMsg(${idx},'${n.msg.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')" style="background:none;border:none;color:var(--acc);font-size:.74rem;cursor:pointer;padding:.15rem 0;font-family:var(--fb);" id="cnotif-btn-${idx}">Read more ▾</button>`:''}
+      <div class="notif-time">${n.time}</div>
+    </div>
+  </div>`;
+}
+function toggleNotifMsg(idx,fullMsg){
+  const el=$('cnotif-msg-'+idx);
+  const btn=$('cnotif-btn-'+idx);
+  if(!el||!btn) return;
+  const isExpanded=el.dataset.expanded==='1';
+  el.textContent=isExpanded?fullMsg.substring(0,80)+(fullMsg.length>80?'…':''):fullMsg.replace(/\\n/g,'\n');
+  el.dataset.expanded=isExpanded?'0':'1';
+  btn.textContent=isExpanded?'Read more ▾':'Show less ▴';
 }
 function notifRow(n){
   const icons={whatsapp:'💬',email:'📧',sms:'📱',admin_email:'📧'};
@@ -1960,6 +2056,36 @@ function savePrf(){
   CU={...CU,fn:nms[0],ln:nms.slice(1).join(' '),phone:ph,addr:ad};
   $('c-nm2').textContent=CU.fn+' '+CU.ln;
   toast('✅ Profile saved!');
+}
+
+function changePwd(){
+  const cp=v('pf-cpw'),np=v('pf-npw'),cnp=v('pf-cnpw');
+  if(!cp){shakeField('pf-cpw');return;}
+  if(!np||np.length<6){shakeField('pf-npw');return toast('New password must be at least 6 characters.','err');}
+  if(np!==cnp){shakeField('pf-cnpw');return toast('Passwords do not match.','err');}
+  const users=DB.users();
+  const u=users.find(x=>x.email===CU.email);
+  if(!u||u.pass!==cp){shakeField('pf-cpw');return toast('Current password is incorrect.','err');}
+  DB.upUser(CU.email,{pass:np});
+  $('pf-cpw').value='';$('pf-npw').value='';$('pf-cnpw').value='';
+  toast('✅ Password changed successfully!');
+}
+
+// ── DASHBOARD KPI CLICK — show filtered bookings ──
+function dashKpiClick(f,period){
+  if(f==='customers'){apanel('customers',null);document.querySelectorAll('#adminNav .sb-lnk').forEach((l,i)=>{l.classList.toggle('on',i===2);});return;}
+  adminSFilt=(f==='all')?'all':f;
+  adminDFilt=period||'all';
+  apanel('bookings',null);
+  document.querySelectorAll('#adminNav .sb-lnk').forEach((l,i)=>{l.classList.toggle('on',i===1);});
+  // Apply filters visually
+  setTimeout(()=>{
+    document.querySelectorAll('#ap-bookings .ftab').forEach(t=>{t.classList.toggle('on',t.textContent.toLowerCase().replace(' ','')===f||( f==='all'&&t.textContent.trim()==='All'));});
+    if(period&&period!=='all'){
+      document.querySelectorAll('.dbar-btn').forEach(b=>{b.classList.toggle('on',b.textContent.trim().toLowerCase()===period);});
+    }
+    renderAdminBks();
+  },50);
 }
 
 // ══════════════════════════════════════
@@ -1988,7 +2114,9 @@ function buildAdminNav(){
     ${perSvc.map(s=>`
     <div class="sb-lnk" onclick="apanel('svc-${s.id}',this)"><span class="sb-ic">${s.em}</span> ${s.name}${s.pending>0?`<span class="sb-badge">${s.pending}</span>`:''}</div>`).join('')}
     <div class="sb-sep"></div>
-    <div class="sb-lnk" onclick="apanel('services',this)"><span class="sb-ic">🛠️</span> Catalogue</div>`;
+    <div class="sb-lnk" onclick="apanel('services',this)"><span class="sb-ic">🛠️</span> Catalogue</div>
+    <div class="sb-lnk" onclick="apanel('prices',this)"><span class="sb-ic">💲</span> Manage Prices</div>
+    <div class="sb-lnk" onclick="apanel('revenue',this)"><span class="sb-ic">💰</span> Revenue</div>`;
   // re-attach active state
   document.querySelectorAll('#adminNav .sb-lnk').forEach(l=>{
     l.addEventListener('click',function(){
@@ -2020,6 +2148,8 @@ function apanel(n,el){
   if(n==='reviews') renderAdminReviews();
   if(n==='notifications') renderAdminNotifs();
   if(n==='services') renderAdminSvcs();
+  if(n==='revenue') renderRevenueDash();
+  if(n==='prices') renderPriceMgmt();
   SVCS.forEach(s=>{if(n==='svc-'+s.id) renderSvcPanel(s.id,s.name);});
 }
 
@@ -2046,20 +2176,58 @@ function renderAdminDash(){
   const all=DB.bks();const bks=filterByPeriod(all,curPeriod);const us=DB.users();
   const pl={today:"Today's",yesterday:"Yesterday's",week:"This Week's",month:"This Month's",year:"This Year's",all:"All Time"};
   const kd=[
-    {ic:'📋',n:bks.length,l:pl[curPeriod]+' Bookings'},
-    {ic:'👥',n:us.length,l:'Total Customers'},
-    {ic:'⏳',n:bks.filter(b=>b.status==='pending').length,l:'Pending'},
-    {ic:'✅',n:bks.filter(b=>b.status==='confirmed').length,l:'Confirmed'},
-    {ic:'🔧',n:bks.filter(b=>b.status==='inprogress').length,l:'In Progress'},
-    {ic:'🏆',n:bks.filter(b=>b.status==='completed').length,l:'Completed'},
+    {ic:'📋',n:bks.length,l:pl[curPeriod]+' Bookings',f:'all',p:curPeriod},
+    {ic:'👥',n:us.length,l:'Total Customers',f:'customers',p:null},
+    {ic:'⏳',n:bks.filter(b=>b.status==='pending').length,l:'Pending',f:'pending',p:curPeriod},
+    {ic:'✅',n:bks.filter(b=>b.status==='confirmed').length,l:'Confirmed',f:'confirmed',p:curPeriod},
+    {ic:'🔧',n:bks.filter(b=>b.status==='inprogress').length,l:'In Progress',f:'inprogress',p:curPeriod},
+    {ic:'🏆',n:bks.filter(b=>b.status==='completed').length,l:'Completed',f:'completed',p:curPeriod},
   ];
-  $('a-kpis').innerHTML=kd.map(k=>`<div class="kpi"><div class="kpi-ic">${k.ic}</div><div class="kpi-n">${k.n}</div><div class="kpi-l">${k.l}</div></div>`).join('');
+  $('a-kpis').innerHTML=kd.map(k=>`<div class="kpi" style="cursor:pointer;" onclick="dashKpiClick('${k.f}','${k.p||''}')"><div class="kpi-ic">${k.ic}</div><div class="kpi-n">${k.n}</div><div class="kpi-l">${k.l}</div><div style="font-size:.62rem;color:var(--acc);margin-top:.25rem;">Click to view →</div></div>`).join('');
   const sm=Math.max(...SVCS.map(s=>all.filter(b=>b.svc===s.name).length),1);
-  $('a-svc-bar').innerHTML=SVCS.map(s=>{const c=all.filter(b=>b.svc===s.name).length;return`<div style="margin-bottom:.82rem;"><div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.27rem;"><span>${s.em} ${s.name}</span><span style="color:var(--acc);font-weight:700;">${c}</span></div><div style="background:var(--s2);border-radius:4px;height:7px;overflow:hidden;"><div style="height:100%;width:${Math.round(c/sm*100)}%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:4px;transition:width .5s;"></div></div></div>`;}).join('');
-  const sts=[['pending',all.filter(b=>b.status==='pending').length,'var(--yl)'],['confirmed',all.filter(b=>b.status==='confirmed').length,'var(--bl)'],['inprogress',all.filter(b=>b.status==='inprogress').length,'var(--acc)'],['completed',all.filter(b=>b.status==='completed').length,'var(--gr)'],['cancelled',all.filter(b=>b.status==='cancelled').length,'var(--rd)']];
+  $('a-svc-bar').innerHTML=SVCS.map(s=>{
+    const c=all.filter(b=>b.svc===s.name).length;
+    const pend=all.filter(b=>b.svc===s.name&&b.status==='pending').length;
+    const comp=all.filter(b=>b.svc===s.name&&b.status==='completed').length;
+    const prog=all.filter(b=>b.svc===s.name&&b.status==='inprogress').length;
+    return`<div style="margin-bottom:1rem;cursor:pointer;" onclick="apanel('svc-${s.id}',null)">
+      <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.3rem;">
+        <span style="font-weight:600;">${s.em} ${s.name}</span>
+        <span style="color:var(--acc);font-weight:700;">${c} total</span>
+      </div>
+      <div style="background:var(--s2);border-radius:4px;height:8px;overflow:hidden;margin-bottom:.3rem;">
+        <div style="height:100%;width:${Math.round(c/sm*100)}%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:4px;transition:width .5s;"></div>
+      </div>
+      <div style="display:flex;gap:.5rem;font-size:.68rem;">
+        <span style="color:var(--yl);">⏳ ${pend} pending</span>
+        <span style="color:var(--acc);">🔧 ${prog} active</span>
+        <span style="color:var(--gr);">✅ ${comp} done</span>
+      </div>
+    </div>`;
+  }).join('');
+  const sts=[['pending',bks.filter(b=>b.status==='pending').length,'var(--yl)','⏳'],['confirmed',bks.filter(b=>b.status==='confirmed').length,'var(--bl)','✅'],['inprogress',bks.filter(b=>b.status==='inprogress').length,'var(--acc)','🔧'],['completed',bks.filter(b=>b.status==='completed').length,'var(--gr)','🏆'],['cancelled',bks.filter(b=>b.status==='cancelled').length,'var(--rd)','❌']];
   const stm=Math.max(...sts.map(s=>s[1]),1);
-  $('a-st-bar').innerHTML=sts.map(([s,c,col])=>`<div style="margin-bottom:.82rem;"><div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.27rem;"><span style="text-transform:capitalize;">${s==='inprogress'?'In Progress':s}</span><span style="color:${col};font-weight:700;">${c}</span></div><div style="background:var(--s2);border-radius:4px;height:7px;overflow:hidden;"><div style="height:100%;width:${Math.round(c/stm*100)}%;background:${col};border-radius:4px;transition:width .5s;"></div></div></div>`).join('');
-  $('a-recent').innerHTML=all.slice(0,6).map(adminRow).join('')||empBox('No bookings yet.');
+  // Status pipeline / flowchart
+  $('a-st-bar').innerHTML=`<div style="padding:.8rem;">
+    <div style="display:flex;align-items:stretch;gap:0;margin-bottom:1.1rem;border-radius:10px;overflow:hidden;border:1px solid var(--bdr);">
+      ${sts.filter(s=>s[0]!=='cancelled').map(([st,c,col,ic],i,arr)=>`
+      <div style="flex:1;padding:.6rem .4rem;background:var(--s2);text-align:center;border-right:${i<arr.length-1?'1px solid var(--bdr)':'none'};">
+        <div style="font-size:1rem;">${ic}</div>
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:900;color:${col};">${c}</div>
+        <div style="font-size:.62rem;color:var(--mu);text-transform:capitalize;">${st==='inprogress'?'Active':st}</div>
+      </div>`).join('')}
+    </div>
+    ${sts.map(([s,c,col,ic])=>`<div style="margin-bottom:.75rem;">
+      <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.27rem;">
+        <span style="text-transform:capitalize;">${ic} ${s==='inprogress'?'In Progress':s}</span>
+        <span style="color:${col};font-weight:700;">${c}</span>
+      </div>
+      <div style="background:var(--s2);border-radius:4px;height:7px;overflow:hidden;">
+        <div style="height:100%;width:${Math.round(c/stm*100)}%;background:${col};border-radius:4px;transition:width .5s;"></div>
+      </div>
+    </div>`).join('')}
+  </div>`;
+  $('a-recent').innerHTML=bks.slice(0,6).map(adminRow).join('')||empBox('No bookings yet.');
 }
 
 // Admin booking list
@@ -2099,17 +2267,428 @@ function adminRow(b){
         b.status==='confirmed'?
         '<button class="abt" style="background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.4);color:var(--acc);font-weight:700;padding:.3rem 1rem;font-size:.78rem;" onclick="aUpd(\''+b.id+'\',\'inprogress\')">🔧 Start Work</button>':
         b.status==='inprogress'?
-        '<button class="abt" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#3b82f6;font-weight:700;padding:.3rem 1rem;font-size:.78rem;" onclick="aUpd(\''+b.id+'\',\'completed\')">🏆 Mark Complete</button>':''
+        '<button class="abt" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#3b82f6;font-weight:700;padding:.3rem 1rem;font-size:.78rem;" onclick="showCompleteModal(\''+b.id+'\')">🏆 Mark Complete</button>':''
       }
       ${!['completed','cancelled'].includes(b.status)?'<button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);padding:.3rem .8rem;font-size:.78rem;" onclick="aUpd(\''+b.id+'\',\'cancelled\')">❌ Cancel</button>':''}
       <button class="abt wa" style="padding:.3rem .9rem;font-size:.78rem;" onclick="sendWhatsAppNotif('${b.id}')">💬 Send WhatsApp</button>
       <button class="abt" style="padding:.3rem .8rem;font-size:.78rem;color:var(--bl);border-color:rgba(59,130,246,.35);" onclick="getDirections('${b.addr.replace(/'/g,"\\'")}','${b.lmk?b.lmk.replace(/'/g,"\\'"):''}')">🗺️ Get Directions</button>
+      ${b.status==='completed'?'<button class="abt" style="padding:.3rem .8rem;font-size:.78rem;color:var(--gr);border-color:rgba(16,185,129,.35);" onclick="downloadInvoice(\''+b.id+'\')">⬇ Invoice</button>':''}
       <button class="abt" style="padding:.3rem .8rem;font-size:.78rem;color:var(--rd);border-color:rgba(239,68,68,.35);font-weight:700;" onclick="aDel('${b.id}')">🗑️ Delete</button>
     </div></div>
     <span class="badge b-${b.status}">${b.status==='inprogress'?'In Progress':b.status}</span>
   </div>`;
 }
-// ── BOOKING RESERVATION MODAL ──
+// ── BOOKING CONFIRMATION POPUP ──
+function showBookingConfirmPopup(bk){
+  const old=document.getElementById('bkConfirmModal');if(old)old.remove();
+  document.body.style.overflow='hidden';
+  const modal=document.createElement('div');
+  modal.id='bkConfirmModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:24px;width:100%;max-width:480px;padding:0;overflow:hidden;animation:upIn .3s ease;">
+    <div style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(249,115,22,.08));padding:1.8rem 1.8rem 1.2rem;text-align:center;border-bottom:1px solid var(--bdr);">
+      <div style="font-size:3rem;margin-bottom:.5rem;">🎉</div>
+      <h2 style="font-family:var(--fh);font-size:1.35rem;font-weight:900;color:var(--gr);margin-bottom:.3rem;">Booking Confirmed!</h2>
+      <div style="font-family:monospace;background:var(--s2);border:1px solid var(--bdr);padding:.4rem .9rem;border-radius:8px;display:inline-block;color:var(--acc);font-size:.88rem;font-weight:700;letter-spacing:.04em;">${bk.id}</div>
+    </div>
+    <div style="padding:1.4rem;">
+      <div style="display:grid;gap:.6rem;margin-bottom:1.2rem;">
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--mu);">Service</span><span style="font-weight:700;color:var(--tx);">${bk.svc}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--mu);">Type</span><span style="font-weight:700;color:var(--acc);">${bk.sub}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--mu);">Date &amp; Time</span><span style="font-weight:700;">${bk.date} at ${bk.time}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--mu);">Address</span><span style="font-weight:700;text-align:right;max-width:60%;">${bk.addr}</span>
+        </div>
+        ${bk.lmk?`<div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;"><span style="color:var(--mu);">Landmark</span><span style="font-weight:700;">${bk.lmk}</span></div>`:''}
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--mu);">Customer</span><span style="font-weight:700;">${bk.uname}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:var(--s2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--mu);">Phone</span><span style="font-weight:700;">${bk.uphone}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:.6rem .8rem;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:10px;font-size:.84rem;">
+          <span style="color:var(--yl);">Status</span><span style="font-weight:700;color:var(--yl);">⏳ Pending Confirmation</span>
+        </div>
+      </div>
+      <p style="color:var(--mu);font-size:.78rem;text-align:center;margin-bottom:1.2rem;">📱 You will receive WhatsApp &amp; SMS confirmation with updates.</p>
+      <div style="display:flex;gap:.7rem;">
+        <button onclick="document.getElementById('bkConfirmModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--tx);padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Close</button>
+        ${bk.uemail&&bk.uemail!=='guest@servenow.in'?`<button onclick="downloadInvoice('${bk.id}');document.getElementById('bkConfirmModal').remove();document.body.style.overflow='';" style="flex:2;background:var(--acc);color:#fff;border:none;padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">⬇ Download Invoice</button>`:`<button onclick="openAnonInvoice('${bk.id}');document.getElementById('bkConfirmModal').remove();document.body.style.overflow='';" style="flex:2;background:var(--acc);color:#fff;border:none;padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">📧 Get Invoice</button>`}
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal){modal.remove();document.body.style.overflow='';}});
+}
+
+// ── INVOICE GENERATION ──
+function buildInvoiceHTML(bk,amount,gst){
+  const gstAmt=amount&&gst?Math.round(amount*gst/100):0;
+  const total=amount?(amount+gstAmt):null;
+  return`<!DOCTYPE html><html><head><meta charset="UTF-8">
+<style>body{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;max-width:700px;margin:0 auto;padding:2rem;}
+.inv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #f97316;padding-bottom:1rem;margin-bottom:1.5rem;}
+.inv-logo{font-size:1.6rem;font-weight:900;color:#111;}.inv-logo b{color:#f97316;}
+.inv-tag{font-size:.7rem;color:#f97316;font-weight:700;letter-spacing:.1em;}
+.inv-id{font-size:.85rem;color:#555;}
+.inv-table{width:100%;border-collapse:collapse;margin:1.2rem 0;}
+.inv-table th{background:#f97316;color:#fff;padding:.6rem .9rem;text-align:left;font-size:.82rem;}
+.inv-table td{border-bottom:1px solid #eee;padding:.6rem .9rem;font-size:.85rem;}
+.inv-table tr:last-child td{border-bottom:none;}
+.inv-total{background:#fff8f3;border:2px solid #f97316;border-radius:8px;padding:1rem 1.2rem;text-align:right;margin-top:1rem;}
+.inv-foot{margin-top:2rem;font-size:.72rem;color:#888;border-top:1px solid #eee;padding-top:.8rem;text-align:center;}
+.badge{background:#fef3c7;color:#d97706;padding:.15rem .5rem;border-radius:4px;font-size:.74rem;font-weight:700;}
+</style></head><body>
+<div class="inv-head">
+  <div><div class="inv-logo">Serve<b>Now</b></div><div class="inv-tag">ARIYALUR &amp; PERAMBALUR</div><div style="font-size:.75rem;color:#888;margin-top:.3rem;">support@servenow.in | +91 94XXX XXXXX</div></div>
+  <div style="text-align:right;"><div style="font-size:1.1rem;font-weight:700;color:#f97316;">TAX INVOICE</div><div class="inv-id">Booking ID: <strong>${bk.id}</strong></div><div style="font-size:.78rem;color:#888;">Date: ${bk.date}</div><div style="font-size:.78rem;color:#888;">Generated: ${fmtDT(new Date())}</div></div>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
+  <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Bill To</div><div>${bk.uname}</div><div style="color:#555;font-size:.83rem;">${bk.uphone}</div><div style="color:#555;font-size:.83rem;">${bk.uemail||''}</div></div>
+  <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Service Address</div><div style="font-size:.83rem;color:#555;">${bk.addr}</div>${bk.lmk?`<div style="font-size:.8rem;color:#888;">Landmark: ${bk.lmk}</div>`:''}</div>
+</div>
+<table class="inv-table">
+  <thead><tr><th>Service</th><th>Sub-Service</th><th>Date &amp; Time</th><th>Base Amount</th></tr></thead>
+  <tbody><tr>
+    <td>${bk.svc}</td>
+    <td>${bk.sub}</td>
+    <td>${bk.date} at ${bk.time}</td>
+    <td>${amount?'₹'+amount.toLocaleString('en-IN'):'—'}</td>
+  </tr></tbody>
+</table>
+${amount?`<div class="inv-total">
+  <div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;"><span>Sub-total:</span><span>₹${amount.toLocaleString('en-IN')}</span></div>
+  ${gst?`<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;color:#d97706;"><span>GST (${gst}%):</span><span>₹${gstAmt.toLocaleString('en-IN')}</span></div>`:''}
+  <div style="display:flex;justify-content:flex-end;gap:2rem;font-size:1rem;font-weight:700;border-top:1px solid #f97316;padding-top:.4rem;color:#f97316;"><span>TOTAL:</span><span>₹${total.toLocaleString('en-IN')}</span></div>
+</div>`:'<div style="background:#fff8f3;border:1px solid #f97316;border-radius:8px;padding:1rem;text-align:center;color:#d97706;font-size:.85rem;">Amount will be confirmed after service completion.</div>'}
+<div style="margin-top:1rem;"><span class="badge">Status: ${bk.status}</span></div>
+${bk.notes?`<div style="margin-top:.8rem;font-size:.82rem;color:#555;"><strong>Notes:</strong> ${bk.notes}</div>`:''}
+<div class="inv-foot">ServeNow | Ariyalur, Tamil Nadu 621704 | Perambalur, Tamil Nadu 621212<br>Thank you for choosing ServeNow! 🙏</div>
+</body></html>`;
+}
+function downloadInvoice(bkId){
+  const bk=DB.findBk(bkId);if(!bk)return toast('Booking not found.','err');
+  const html=buildInvoiceHTML(bk,bk.totalAmount||null,bk.gstPct||18);
+  const blob=new Blob([html],{type:'text/html;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');a.href=url;a.download='ServeNow_Invoice_'+bkId+'.html';a.click();URL.revokeObjectURL(url);
+  toast('✅ Invoice downloaded!');
+}
+function openAnonInvoice(bkId){
+  const bk=DB.findBk(bkId);if(!bk)return;
+  const old=document.getElementById('anonInvModal');if(old)old.remove();
+  document.body.style.overflow='hidden';
+  const modal=document.createElement('div');
+  modal.id='anonInvModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9001;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:420px;padding:2rem;">
+    <h3 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:.5rem;">📄 Get Your Invoice</h3>
+    <p style="color:var(--mu);font-size:.82rem;margin-bottom:1.2rem;">Your invoice will be sent via WhatsApp or you can download it directly.</p>
+    <div style="display:flex;gap:.7rem;">
+      <button onclick="downloadInvoice('${bkId}');document.getElementById('anonInvModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--acc);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">⬇ Download</button>
+      <button onclick="sendInvoiceWA('${bkId}');document.getElementById('anonInvModal').remove();document.body.style.overflow='';" style="flex:1;background:#25d366;color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">💬 WhatsApp</button>
+    </div>
+    <button onclick="document.getElementById('anonInvModal').remove();document.body.style.overflow='';" style="width:100%;margin-top:.7rem;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fb);cursor:pointer;">Cancel</button>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function sendInvoiceWA(bkId){
+  const bk=DB.findBk(bkId);if(!bk)return;
+  const msg=`📄 *ServeNow Invoice*\n\nBooking ID: ${bk.id}\nService: ${bk.svc} — ${bk.sub}\nDate: ${bk.date} at ${bk.time}\nAddress: ${bk.addr}\nStatus: ${bk.status}\n\nThank you for choosing ServeNow! 🙏\nFor invoice copy: support@servenow.in`;
+  openWhatsApp(bk.uphone,msg);
+}
+
+// ── CUSTOMER INVOICE DOWNLOAD ──
+function custDownloadInvoice(bkId){
+  const bk=DB.findBk(bkId);if(!bk)return toast('Booking not found.','err');
+  downloadInvoice(bkId);
+}
+
+// ── ADMIN: COMPLETE ORDER WITH AMOUNT + GST ──
+function showCompleteModal(bkId){
+  const bk=DB.findBk(bkId);if(!bk)return;
+  const old=document.getElementById('completeModal');if(old)old.remove();
+  document.body.style.overflow='hidden';
+  const modal=document.createElement('div');
+  modal.id='completeModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:460px;padding:0;overflow:hidden;">
+    <div style="background:rgba(16,185,129,.1);padding:1.3rem 1.5rem;border-bottom:1px solid var(--bdr);">
+      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--gr);">🏆 Complete Order</h2>
+      <p style="color:var(--mu);font-size:.78rem;margin-top:.2rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
+    </div>
+    <div style="padding:1.5rem;">
+      <div class="fg"><label>Total Amount (₹) <span style="color:var(--rd);">*</span></label><input type="number" id="comp-amt" placeholder="e.g. 1500" min="0" oninput="calcCompGST()"></div>
+      <div class="fg"><label>GST Rate (%)</label>
+        <select id="comp-gst" onchange="calcCompGST()">
+          <option value="0">No GST (0%)</option>
+          <option value="5">5%</option>
+          <option value="12">12%</option>
+          <option value="18" selected>18%</option>
+          <option value="28">28%</option>
+        </select>
+      </div>
+      <div id="comp-calc" style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;display:none;">
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--mu);">Sub-total:</span><span id="comp-sub">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--yl);">GST Amount:</span><span id="comp-gst-amt" style="color:var(--yl);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--gr);">TOTAL:</span><span id="comp-total" style="color:var(--gr);">—</span></div>
+      </div>
+      <div style="display:flex;gap:.7rem;">
+        <button onclick="document.getElementById('completeModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
+        <button onclick="confirmComplete('${bkId}')" style="flex:2;background:var(--gr);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">Complete &amp; Send Invoice</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+}
+function calcCompGST(){
+  const amt=parseFloat($('comp-amt')?.value)||0;
+  const gst=parseFloat($('comp-gst')?.value)||0;
+  const calc=$('comp-calc');
+  if(!calc) return;
+  if(amt>0){
+    calc.style.display='block';
+    const gstAmt=Math.round(amt*gst/100);
+    const total=amt+gstAmt;
+    $('comp-sub').textContent='₹'+amt.toLocaleString('en-IN');
+    $('comp-gst-amt').textContent='₹'+gstAmt.toLocaleString('en-IN')+' ('+gst+'%)';
+    $('comp-total').textContent='₹'+total.toLocaleString('en-IN');
+  } else {
+    calc.style.display='none';
+  }
+}
+function confirmComplete(bkId){
+  const amt=parseFloat($('comp-amt')?.value)||0;
+  const gst=parseFloat($('comp-gst')?.value)||0;
+  if(!amt){shakeField('comp-amt');return toast('Please enter the total amount.','err');}
+  const gstAmt=Math.round(amt*gst/100);
+  const total=amt+gstAmt;
+  DB.upBk(bkId,{status:'completed',totalAmount:amt,gstPct:gst,gstAmount:gstAmt,grandTotal:total,completedOn:fmtDT(new Date())});
+  const bk=DB.findBk(bkId);
+  document.getElementById('completeModal')?.remove();
+  document.body.style.overflow='';
+  // Send notification
+  sendNotification({type:'update',to:bk.uemail,phone:bk.uphone,name:bk.uname,bkId:bk.id,svc:bk.svc,sub:bk.sub,date:bk.date,time:bk.time,addr:bk.addr,status:'completed'});
+  renderAdminDash();renderAdminBks();buildAdminNav();
+  SVCS.forEach(s=>{if($('list-svc-'+s.id)&&$('ap-svc-'+s.id)?.classList.contains('on'))renderSvcPanel(s.id,s.name);});
+  toast('🏆 Booking completed! Invoice ready.');
+  setTimeout(()=>{if(confirm('Download invoice for this booking?'))downloadInvoice(bkId);},500);
+}
+
+// ── ADMIN REVIEWS WITH FILTER ──
+let adminRvFilt='all';
+function rvFilt(f,el){
+  adminRvFilt=f;
+  document.querySelectorAll('#ap-reviews .ftab').forEach(t=>t.classList.remove('on'));
+  if(el) el.classList.add('on');
+  renderAdminReviews();
+}
+function renderAdminReviews(){
+  let rs=DB.reviews();
+  const search=v('rv-search').toLowerCase();
+  if(search) rs=rs.filter(r=>(r.uname||'').toLowerCase().includes(search)||(r.svc||'').toLowerCase().includes(search)||(r.text||'').toLowerCase().includes(search));
+  if(adminRvFilt==='featured') rs=rs.filter(r=>r.featured);
+  else if(adminRvFilt==='5') rs=rs.filter(r=>r.rating===5);
+  else if(adminRvFilt==='4') rs=rs.filter(r=>r.rating===4);
+  else if(adminRvFilt==='3') rs=rs.filter(r=>r.rating<=3);
+  $('a-rv-cnt').textContent=rs.length+' Review'+(rs.length!==1?'s':'');
+  // Stats row
+  const all=DB.reviews();
+  const avg=all.length?( all.reduce((a,r)=>a+r.rating,0)/all.length).toFixed(1):0;
+  const statsHtml=`<div style="display:grid;grid-template-columns:repeat(5,1fr);gap:.6rem;padding:1rem;border-bottom:1px solid var(--bdr);">
+    ${[5,4,3,2,1].map(star=>{const cnt=all.filter(r=>r.rating===star).length;const pct=all.length?Math.round(cnt/all.length*100):0;return`<div style="text-align:center;background:var(--s2);border-radius:12px;padding:.8rem .4rem;cursor:pointer;" onclick="rvFilt('${star==='3'?'3':star}',null)">
+      <div style="font-size:1.2rem;font-family:var(--fh);font-weight:900;color:var(--yl);">${star}★</div>
+      <div style="font-size:.75rem;color:var(--tx);font-weight:700;">${cnt}</div>
+      <div style="font-size:.62rem;color:var(--mu);">${pct}%</div>
+    </div>`;}).join('')}
+  </div>
+  <div style="padding:.8rem 1rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:1rem;">
+    <div style="font-size:2rem;font-family:var(--fh);font-weight:900;color:var(--yl);">${avg}★</div>
+    <div style="color:var(--mu);font-size:.82rem;">avg rating from ${all.length} reviews</div>
+  </div>`;
+  $('a-rv-list').innerHTML=statsHtml+(rs.length?rs.map(r=>`<div class="br">
+    <div>
+      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.3rem;">
+        <div style="background:linear-gradient(135deg,var(--acc),var(--acc2));width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--fh);font-weight:800;font-size:.75rem;flex-shrink:0;">${(r.uname||'U').substring(0,2).toUpperCase()}</div>
+        <div><div style="font-weight:700;font-size:.88rem;">${r.uname}</div><div style="font-size:.72rem;color:var(--mu);">${r.uemail}</div></div>
+        <div style="margin-left:auto;text-align:right;"><div style="color:var(--yl);font-size:1rem;">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div><div style="font-size:.68rem;color:var(--mu);">${r.time}</div></div>
+      </div>
+      <div style="background:var(--s2);border-radius:10px;padding:.75rem 1rem;font-size:.84rem;line-height:1.65;color:rgba(240,240,248,.8);font-style:italic;">"${r.text}"</div>
+      <div style="margin-top:.4rem;font-size:.72rem;color:var(--acc);font-weight:700;">${r.svc}${r.bkId?' • '+r.bkId:''}${r.featured?' • ⭐ On Home Page':''}</div>
+    </div>
+    <div class="act-row" style="margin-top:.6rem;">
+      <button class="abt" style="color:${r.featured?'var(--rd)':'var(--gr)'};border-color:${r.featured?'rgba(239,68,68,.35)':'rgba(16,185,129,.4)'};font-weight:700;" onclick="toggleFeatureReview('${r.id}')">${r.featured?'✕ Remove from Home':'⭐ Feature on Home'}</button>
+      <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="delReview('${r.id}')">🗑️ Delete</button>
+    </div>
+  </div>`).join(''):empBox('No reviews match filters.'));
+}
+
+// ── REVENUE DASHBOARD ──
+function renderRevenueDash(){
+  const bks=DB.bks().filter(b=>b.status==='completed'&&b.totalAmount);
+  const totalRev=bks.reduce((a,b)=>a+(b.grandTotal||b.totalAmount||0),0);
+  const totalGST=bks.reduce((a,b)=>a+(b.gstAmount||0),0);
+  const svcRev=SVCS.map(s=>{
+    const sb=bks.filter(b=>b.svc===s.name);
+    const rev=sb.reduce((a,b)=>a+(b.grandTotal||b.totalAmount||0),0);
+    return{...s,rev,cnt:sb.length};
+  }).sort((a,b)=>b.rev-a.rev);
+  const maxRev=Math.max(...svcRev.map(s=>s.rev),1);
+
+  // Monthly breakdown
+  const monthly={};
+  bks.forEach(b=>{
+    const mon=b.date?b.date.substring(0,7):'Unknown';
+    if(!monthly[mon]) monthly[mon]={rev:0,cnt:0,gst:0};
+    monthly[mon].rev+=(b.grandTotal||b.totalAmount||0);
+    monthly[mon].cnt++;
+    monthly[mon].gst+=(b.gstAmount||0);
+  });
+  const months=Object.keys(monthly).sort().slice(-6);
+
+  $('rev-dash-content').innerHTML=`
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-bottom:1.4rem;">
+    <div class="kpi" style="background:linear-gradient(135deg,rgba(249,115,22,.15),rgba(249,115,22,.05));border-color:rgba(249,115,22,.3);">
+      <div class="kpi-ic">💰</div><div class="kpi-n" style="color:var(--acc);">₹${totalRev.toLocaleString('en-IN')}</div><div class="kpi-l">Total Revenue</div>
+    </div>
+    <div class="kpi" style="background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.05));border-color:rgba(245,158,11,.3);">
+      <div class="kpi-ic">🧾</div><div class="kpi-n" style="color:var(--yl);">₹${totalGST.toLocaleString('en-IN')}</div><div class="kpi-l">GST Collected</div>
+    </div>
+    <div class="kpi" style="background:linear-gradient(135deg,rgba(16,185,129,.15),rgba(16,185,129,.05));border-color:rgba(16,185,129,.3);">
+      <div class="kpi-ic">✅</div><div class="kpi-n" style="color:var(--gr);">${bks.length}</div><div class="kpi-l">Completed Orders</div>
+    </div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-bottom:1.4rem;" class="admin-charts-grid">
+    <div class="tc"><div class="tc-hdr"><h3>Revenue by Service</h3></div>
+      <div style="padding:1.1rem;">
+        ${svcRev.map(s=>`<div style="margin-bottom:.9rem;">
+          <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.3rem;">
+            <span>${s.em} ${s.name} <span style="color:var(--mu);font-size:.7rem;">(${s.cnt} orders)</span></span>
+            <span style="color:var(--acc);font-weight:700;">₹${s.rev.toLocaleString('en-IN')}</span>
+          </div>
+          <div style="background:var(--s2);border-radius:4px;height:8px;overflow:hidden;">
+            <div style="height:100%;width:${Math.round(s.rev/maxRev*100)}%;background:linear-gradient(90deg,var(--acc),var(--acc2));border-radius:4px;transition:width .5s;"></div>
+          </div>
+        </div>`).join('')}
+        ${!svcRev.some(s=>s.rev>0)?empBox('No completed revenue yet. Complete orders with amounts to see revenue.'):''}
+      </div>
+    </div>
+    <div class="tc"><div class="tc-hdr"><h3>Monthly Breakdown</h3></div>
+      <div style="padding:1.1rem;">
+        ${months.length?months.map(m=>`<div style="margin-bottom:.9rem;">
+          <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.3rem;">
+            <span>${m}</span>
+            <div style="text-align:right;"><span style="color:var(--gr);font-weight:700;">₹${monthly[m].rev.toLocaleString('en-IN')}</span> <span style="color:var(--mu);font-size:.7rem;">(${monthly[m].cnt} orders)</span></div>
+          </div>
+          <div style="font-size:.7rem;color:var(--yl);">GST: ₹${monthly[m].gst.toLocaleString('en-IN')}</div>
+        </div>`).join(''):empBox('No monthly data yet.')}
+      </div>
+    </div>
+  </div>
+  <div class="tc"><div class="tc-hdr"><h3>Completed Orders with Revenue</h3></div>
+    <div>${bks.map(b=>`<div class="br">
+      <div>
+        <div class="br-svc">${b.svc}</div><div class="br-sub">${b.sub}</div>
+        <div class="br-meta">👤 ${b.uname} | 📅 ${b.date}</div>
+        <div class="br-id">${b.id} • Completed: ${b.completedOn||b.lastModified}</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:900;color:var(--gr);">₹${(b.grandTotal||b.totalAmount||0).toLocaleString('en-IN')}</div>
+        ${b.gstAmount?`<div style="font-size:.72rem;color:var(--yl);">GST: ₹${b.gstAmount.toLocaleString('en-IN')}</div>`:''}
+        <button class="abt" style="font-size:.74rem;margin-top:.4rem;" onclick="downloadInvoice('${b.id}')">⬇ Invoice</button>
+      </div>
+    </div>`).join('')||empBox('No completed orders with revenue yet. Use "Mark Complete" and enter amounts.')}
+    </div>
+  </div>`;
+}
+function exportRevenue(){
+  const bks=DB.bks().filter(b=>b.status==='completed');
+  const headers=['id','svc','sub','uname','uemail','uphone','date','completedOn','totalAmount','gstPct','gstAmount','grandTotal'];
+  const csv=toCSV(bks,headers);
+  downloadCSV(csv,'servenow_revenue_'+new Date().toISOString().split('T')[0]+'.csv');
+}
+
+// ── PRICE MANAGEMENT ──
+function renderPriceMgmt(){
+  $('price-mgmt-content').innerHTML=`
+  <p style="color:var(--mu);font-size:.84rem;margin-bottom:1.5rem;padding:0 .2rem;">Update the "From" price shown on service cards and the price shown in service sub-options. Changes are saved to your browser and reflected live on the site.</p>
+  ${SVCS.map(s=>`<div class="tc" style="margin-bottom:1.2rem;">
+    <div class="tc-hdr"><h3>${s.em} ${s.name}</h3>
+      <span style="font-size:.75rem;color:var(--mu);">Base price: <input type="text" value="${s.from}" onchange="updateSvcFrom('${s.id}',this.value)" style="background:var(--s3);border:1px solid var(--bdr);border-radius:6px;padding:.25rem .5rem;color:var(--acc);font-size:.78rem;font-weight:700;width:120px;outline:none;"></span>
+    </div>
+    <div style="padding:.8rem;">
+      ${s.subs.map((sub,i)=>`<div style="display:flex;align-items:center;justify-content:space-between;padding:.55rem .7rem;border-bottom:1px solid var(--bdr);gap:.5rem;">
+        <span style="font-size:.83rem;flex:1;">${sub.em} ${sub.name}</span>
+        <input type="text" value="${sub.price}" onchange="updateSubPrice('${s.id}',${i},this.value)" style="background:var(--s3);border:1px solid rgba(249,115,22,.3);border-radius:6px;padding:.3rem .6rem;color:var(--acc);font-size:.82rem;font-weight:700;width:130px;outline:none;text-align:right;">
+      </div>`).join('')}
+    </div>
+  </div>`).join('')}`;
+}
+function updateSvcFrom(svcId,val){
+  const s=SVCS.find(x=>x.id===svcId);if(s){s.from=val;renderHome();}
+  toast('✅ Price updated!');
+}
+function updateSubPrice(svcId,idx,val){
+  const s=SVCS.find(x=>x.id===svcId);if(s&&s.subs[idx]){s.subs[idx].price=val;}
+  toast('✅ Sub-service price updated!');
+}
+
+// ── CUSTOMER SEARCH IN ADMIN ──
+function renderAdminCusts(){
+  const search=v('cu-search').toLowerCase();
+  let us=DB.users();
+  if(search) us=us.filter(u=>(u.fn+' '+u.ln).toLowerCase().includes(search)||u.email.toLowerCase().includes(search)||(u.phone||'').toLowerCase().includes(search));
+  const bks=DB.bks();
+  $('a-cu-cnt').textContent=us.length+' Customer'+(us.length!==1?'s':'')+(search?' (filtered)':'');
+  $('a-cu-list').innerHTML=us.map(u=>{
+    const myBks=bks.filter(b=>b.uemail===u.email);
+    const lastBk=myBks[0];
+    const init=(u.fn[0]+(u.ln?u.ln[0]:'')).toUpperCase();
+    return`<div class="cust-detail-card">
+      <div class="cust-card-hdr">
+        <div class="cust-big-av">${init}</div>
+        <div style="flex:1;">
+          <div style="font-family:var(--fh);font-weight:700;font-size:1rem;">${u.fn} ${u.ln}</div>
+          <div style="color:var(--acc);font-size:.78rem;margin-top:.15rem;">${u.email}</div>
+          <div style="color:var(--mu);font-size:.75rem;margin-top:.1rem;">${u.phone}</div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-family:var(--fh);font-size:1.6rem;font-weight:900;color:var(--acc);">${myBks.length}</div>
+          <div style="font-size:.68rem;color:var(--mu);">bookings</div>
+        </div>
+      </div>
+      <div class="cust-detail-grid">
+        <div class="cust-detail-item"><label>Registered On</label><span>${u.joined||'—'}</span></div>
+        <div class="cust-detail-item"><label>Last Modified</label><span>${u.lastModified||'—'}</span></div>
+        <div class="cust-detail-item"><label>Last Login</label><span>${u.lastLogin||'—'}</span></div>
+        <div class="cust-detail-item"><label>Login Count</label><span>${u.loginCount||1} times</span></div>
+        <div class="cust-detail-item"><label>Default Address</label><span>${u.addr||'Not set'}</span></div>
+        <div class="cust-detail-item"><label>Total Earned (Est.)</label><span>₹${bks.filter(b=>b.uemail===u.email&&b.grandTotal).reduce((a,b)=>a+(b.grandTotal||0),0).toLocaleString('en-IN')}</span></div>
+        <div class="cust-detail-item"><label>Last Booking</label><span>${lastBk?lastBk.svc+' on '+lastBk.date:'—'}</span></div>
+        <div class="cust-detail-item"><label>Active Bookings</label><span>${myBks.filter(b=>['pending','confirmed','inprogress'].includes(b.status)).length}</span></div>
+        <div class="cust-detail-item"><label>Reviews Given</label><span>${DB.reviews().filter(r=>r.uemail===u.email).length}</span></div>
+      </div>
+      <div class="cust-actions">
+        <button class="abt wa" onclick="openWhatsApp('${u.phone}','Hello ${u.fn}! This is ServeNow. How can we help you today?')">💬 WhatsApp</button>
+        <button class="abt" onclick="viewCustBks('${u.email}')">📋 View Bookings</button>
+        <button class="abt gr" onclick="sendNotification({type:'admin',to:'${u.email}',phone:'${u.phone}',name:'${u.fn} ${u.ln}',msg:'Hello ${u.fn}, thank you for using ServeNow! Your satisfaction is our priority.'})">📧 Send Email</button>
+        <button class="abt" style="color:var(--yl);border-color:rgba(245,158,11,.35);" onclick="adminResetPwd('${u.email}','${u.fn}')">🔑 Reset Password</button>
+      </div>
+    </div>`;
+  }).join('')||empBox('No customers match your search.');
+}
+function adminResetPwd(email,name){
+  const newPwd=Math.random().toString(36).slice(-8);
+  DB.upUser(email,{pass:newPwd});
+  alert(`Password for ${name} (${email}) has been reset to:\n\n${newPwd}\n\nPlease share this with the customer securely.`);
+  toast('✅ Password reset for '+name);
+}
 let pendingStatusUpdate={id:null,status:null};
 function aUpd(id,status){
   const b=DB.findBk(id);if(!b)return;
@@ -2248,45 +2827,6 @@ function svcPanFilt(svcId,f,el){
 }
 
 // Customers full details
-function renderAdminCusts(){
-  const us=DB.users();const bks=DB.bks();
-  $('a-cu-cnt').textContent=us.length+' Customer'+(us.length!==1?'s':'');
-  $('a-cu-list').innerHTML=us.map(u=>{
-    const myBks=bks.filter(b=>b.uemail===u.email);
-    const lastBk=myBks[0];
-    const init=(u.fn[0]+(u.ln?u.ln[0]:'')).toUpperCase();
-    return`<div class="cust-detail-card">
-      <div class="cust-card-hdr">
-        <div class="cust-big-av">${init}</div>
-        <div style="flex:1;">
-          <div style="font-family:var(--fh);font-weight:700;font-size:1rem;">${u.fn} ${u.ln}</div>
-          <div style="color:var(--acc);font-size:.78rem;margin-top:.15rem;">${u.email}</div>
-          <div style="color:var(--mu);font-size:.75rem;margin-top:.1rem;">${u.phone}</div>
-        </div>
-        <div style="text-align:right;">
-          <div style="font-family:var(--fh);font-size:1.6rem;font-weight:900;color:var(--acc);">${myBks.length}</div>
-          <div style="font-size:.68rem;color:var(--mu);">bookings</div>
-        </div>
-      </div>
-      <div class="cust-detail-grid">
-        <div class="cust-detail-item"><label>Registered On</label><span>${u.joined||'—'}</span></div>
-        <div class="cust-detail-item"><label>Last Modified</label><span>${u.lastModified||'—'}</span></div>
-        <div class="cust-detail-item"><label>Last Login</label><span>${u.lastLogin||'—'}</span></div>
-        <div class="cust-detail-item"><label>Login Count</label><span>${u.loginCount||1} times</span></div>
-        <div class="cust-detail-item"><label>Default Address</label><span>${u.addr||'Not set'}</span></div>
-        <div class="cust-detail-item"><label>Total Spent (Est.)</label><span>${myBks.filter(b=>b.status==='completed').length} completed jobs</span></div>
-        <div class="cust-detail-item"><label>Last Booking</label><span>${lastBk?lastBk.svc+' on '+lastBk.date:'—'}</span></div>
-        <div class="cust-detail-item"><label>Active Bookings</label><span>${myBks.filter(b=>['pending','confirmed','inprogress'].includes(b.status)).length}</span></div>
-        <div class="cust-detail-item"><label>Reviews Given</label><span>${DB.reviews().filter(r=>r.uemail===u.email).length}</span></div>
-      </div>
-      <div class="cust-actions">
-        <button class="abt wa" onclick="openWhatsApp('${u.phone}','Hello ${u.fn}! This is ServeNow. How can we help you today?')">💬 WhatsApp</button>
-        <button class="abt" onclick="viewCustBks('${u.email}')">📋 View Bookings</button>
-        <button class="abt gr" onclick="sendNotification({type:'admin',to:'${u.email}',phone:'${u.phone}',name:'${u.fn} ${u.ln}',msg:'Hello ${u.fn}, thank you for using ServeNow! Your satisfaction is our priority.'})">📧 Send Email</button>
-      </div>
-    </div>`;
-  }).join('')||empBox('No customers yet.');
-}
 function viewCustBks(email){
   const bks=DB.bks().filter(b=>b.uemail===email);
   apanel('bookings',null);
@@ -2300,11 +2840,12 @@ function renderAdminContacts(){
   $('a-ct-cnt').textContent=cs.length+' Message'+(cs.length!==1?'s':'');
   $('a-ct-list').innerHTML=cs.length?cs.map(c=>`<div class="br">
     <div><div class="br-svc">${c.name}${!c.read?' <span class="badge b-pending" style="margin-left:.4rem;">New</span>':''}</div>
-    <div class="br-sub">${c.email}</div>
+    <div class="br-sub">${c.email}${c.phone?' | 📞 '+c.phone:''}</div>
     <div class="br-meta" style="white-space:pre-wrap;line-height:1.6;">${c.msg}</div>
     <div class="br-id">${c.id} • ${c.time}</div></div>
     <div class="act-row">
       <button class="abt" style="color:var(--bl);border-color:rgba(59,130,246,.35);" onclick="window.open('mailto:${c.email}?subject=Re: Your message to ServeNow')">📧 Reply by Email</button>
+      ${c.phone?`<button class="abt wa" onclick="openWhatsApp('${c.phone}','Hello! This is ServeNow responding to your message. How can we help?')">💬 WhatsApp</button>`:''}
       <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="delContact('${c.id}')">🗑️ Delete</button>
     </div>
   </div>`).join(''):empBox('No contact messages yet.');
@@ -2317,21 +2858,6 @@ function delContact(id){
 }
 
 // Ratings & Reviews
-function renderAdminReviews(){
-  const rs=DB.reviews();
-  $('a-rv-cnt').textContent=rs.length+' Review'+(rs.length!==1?'s':'');
-  $('a-rv-list').innerHTML=rs.length?rs.map(r=>`<div class="br">
-    <div><div class="br-svc" style="color:var(--acc);">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
-    <div class="br-sub">${r.svc}</div>
-    <div class="br-meta">👤 ${r.uname} &nbsp;|&nbsp; 📧 ${r.uemail}</div>
-    <div class="br-meta" style="white-space:pre-wrap;line-height:1.6;">"${r.text}"</div>
-    <div class="br-id">${r.id} • ${r.time}${r.bkId?' • '+r.bkId:''}${r.featured?' • ⭐ Shown on Home Page':''}</div></div>
-    <div class="act-row">
-      <button class="abt" style="color:${r.featured?'var(--rd)':'var(--gr)'};border-color:${r.featured?'rgba(239,68,68,.35)':'rgba(16,185,129,.4)'};font-weight:700;" onclick="toggleFeatureReview('${r.id}')">${r.featured?'✕ Remove from Home':'✅ Show on Home Page'}</button>
-      <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="delReview('${r.id}')">🗑️ Delete</button>
-    </div>
-  </div>`).join(''):empBox('No reviews submitted yet.');
-}
 function toggleFeatureReview(id){
   const r=DB.reviews().find(x=>x.id===id);if(!r)return;
   DB.upReview(id,{featured:!r.featured,approved:true});
@@ -2484,9 +3010,12 @@ function doPubTrack(){
   res.innerHTML=buildTrackHTML(b);
 }
 function sendContact(){
-  if(!v('c-nm')||!v('c-em')||!v('c-mg')) return toast('Please fill all fields.','err');
-  DB.addContact({name:v('c-nm'),email:v('c-em'),msg:v('c-mg')});
-  $('c-nm').value='';$('c-em').value='';$('c-mg').value='';
+  if(!v('c-nm')){shakeField('c-nm');return toast('Name is required.','err');}
+  if(!v('c-em')){shakeField('c-em');return toast('Email is required.','err');}
+  if(!v('c-ph')){shakeField('c-ph');return toast('Phone number is required.','err');}
+  if(!v('c-mg')){shakeField('c-mg');return toast('Message is required.','err');}
+  DB.addContact({name:v('c-nm'),email:v('c-em'),phone:v('c-ph'),msg:v('c-mg')});
+  $('c-nm').value='';$('c-em').value='';$('c-ph').value='';$('c-mg').value='';
   if(isAdmin) buildAdminNav();
   toast('✅ Message sent! We will reply within 24 hours.');
 }
