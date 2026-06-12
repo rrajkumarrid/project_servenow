@@ -584,6 +584,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <div class="fg"><label>Email</label><input type="email" id="li-em" placeholder="you@email.com"></div>
       <div class="fg"><label>Password</label><input type="password" id="li-pw" placeholder="Your password"></div>
       <button class="abtn" onclick="doLogin()">Sign In →</button>
+      <p class="asw" style="display:flex;justify-content:space-between;gap:.5rem;"><a onclick="openRecoveryModal('password')">Forgot password?</a><a onclick="openRecoveryModal('username')">Forgot username?</a></p>
       <p class="asw">No account? <a onclick="atab('reg')">Register free</a></p>
       <div class="ahint" style="margin-top:.9rem;">Demo: <strong>demo@test.com</strong> / <strong>demo123</strong></div>
     </div>
@@ -606,6 +607,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <div class="fg"><label>Admin Email</label><input type="email" id="ad-em" placeholder="admin@servenow.in"></div>
       <div class="fg"><label>Password</label><input type="password" id="ad-pw" placeholder="admin123"></div>
       <button class="abtn" onclick="doAdminLogin()">Access Dashboard →</button>
+      <p class="asw" style="display:flex;justify-content:space-between;gap:.5rem;"><a onclick="openRecoveryModal('password')">Forgot password?</a><a onclick="openRecoveryModal('username')">Forgot username?</a></p>
     </div>
     <div class="aback"><a onclick="goHome()">← Back to ServeNow</a></div>
   </div>
@@ -883,6 +885,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
             <input type="date" class="dbar-inp" id="df-from" onchange="setDFilt('custom',null)">
             <span class="dbar-label">To:</span>
             <input type="date" class="dbar-inp" id="df-to" onchange="setDFilt('custom',null)">
+            <button class="dbar-btn" id="clearFiltBtn" onclick="clearAdminFilters()" style="color:var(--rd);border-color:rgba(239,68,68,.35);">✕ Clear Filters</button>
             <button class="export-btn" onclick="exportFiltered()">⬇ Export Excel</button>
           </div>
           <div id="a-bk-list"></div>
@@ -894,6 +897,16 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
           <button class="export-btn" onclick="exportCustomers()">⬇ Export Excel</button>
         </div>
         <div class="tc"><div class="tc-hdr"><h3 id="a-cu-cnt">All Customers</h3></div><div id="a-cu-list"></div></div>
+      </div>
+      <!-- CONTACT MESSAGES -->
+      <div class="dpanel" id="ap-contacts">
+        <div class="dm-hdr"><div><h1>Contact Messages</h1><p>Messages submitted via the "Contact Us" form</p></div></div>
+        <div class="tc"><div class="tc-hdr"><h3 id="a-ct-cnt">Messages</h3></div><div id="a-ct-list"></div></div>
+      </div>
+      <!-- RATINGS & REVIEWS -->
+      <div class="dpanel" id="ap-reviews">
+        <div class="dm-hdr"><div><h1>Ratings &amp; Reviews</h1><p>Customer feedback — choose which reviews appear on the home page</p></div></div>
+        <div class="tc"><div class="tc-hdr"><h3 id="a-rv-cnt">Reviews</h3></div><div id="a-rv-list"></div></div>
       </div>
       <!-- SERVICES -->
       <div class="dpanel" id="ap-services">
@@ -948,6 +961,11 @@ const DB={
   findBk:id=>DB.bks().find(b=>b.id===id),
   notifs:()=>DB.g('notifications'),
   addNotif:n=>{const a=DB.notifs();a.unshift({...n,id:'N'+Date.now(),time:fmtDT(new Date())});DB.s('notifications',a.slice(0,200));},
+  contacts:()=>DB.g('contacts'),
+  addContact:c=>{const a=DB.contacts();a.unshift({...c,id:'CT'+Date.now(),time:fmtDT(new Date()),read:false});DB.s('contacts',a);},
+  reviews:()=>DB.g('reviews'),
+  addReview:r=>{const a=DB.reviews();a.unshift({...r,id:'RV'+Date.now(),time:fmtDT(new Date()),approved:false,featured:false});DB.s('reviews',a);},
+  upReview:(id,c)=>{const a=DB.reviews();const i=a.findIndex(x=>x.id===id);if(i>-1){a[i]={...a[i],...c};DB.s('reviews',a);}},
 };
 
 // Seed
@@ -1117,6 +1135,13 @@ prefetchGPS();
 function createLeafletMap(divId,onLocationSelect,jumpToGPS){
   const el=document.getElementById(divId);
   if(!el||!window.L) return null;
+  // Destroy any previously-created map instance bound to this container —
+  // otherwise Leaflet keeps the old internal _leaflet_id on the element and
+  // re-initializing on the next open shows a blank/white map.
+  if(leafletMaps[divId]){
+    try{leafletMaps[divId].map.remove();}catch(e){}
+    delete leafletMaps[divId];
+  }
   el.innerHTML='';
   el.style.height='240px';
 
@@ -1166,16 +1191,6 @@ function createLeafletMap(divId,onLocationSelect,jumpToGPS){
     const pos=marker.getLatLng();
     reverseGeocode(pos.lat,pos.lng,onLocationSelect);
   });
-
-  // Add "Go to my location" control button on map
-  const locBtn=L.control({position:'topright'});
-  locBtn.onAdd=function(){
-    const div=L.DomUtil.create('div','');
-    div.innerHTML=`<button onclick="getGPS('${divId.replace('MapDiv','').replace('Div','')==='pickup'?'b-pickup':divId.includes('drop')?'b-drop':'b-addr'}',null,null)" style="background:#f97316;color:#fff;border:none;padding:6px 10px;border-radius:8px;font-size:12px;cursor:pointer;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.4);">📡 My Location</button>`;
-    L.DomEvent.disableClickPropagation(div);
-    return div;
-  };
-  locBtn.addTo(map);
 
   leafletMaps[divId]={map,marker};
   setTimeout(()=>map.invalidateSize(),100);
@@ -1426,6 +1441,59 @@ function doAdminLogin(){
 function doLogout(){CU=null;isAdmin=false;updateNavForUser();hideMobNavs();goHome();toast('Signed out.');}
 
 // ══════════════════════════════════════
+// ACCOUNT RECOVERY — Forgot Username / Password
+// ══════════════════════════════════════
+function openRecoveryModal(mode){
+  document.body.style.overflow='hidden';
+  const old=document.getElementById('recovModal');if(old)old.remove();
+  const isUser=mode==='username';
+  const modal=document.createElement('div');
+  modal.id='recovModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:420px;padding:1.6rem;">
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:.3rem;">${isUser?'🔎 Find Your Username':'🔑 Reset Password'}</h2>
+    <p style="color:var(--mu);font-size:.8rem;line-height:1.6;margin-bottom:1rem;">${isUser?'Enter your registered phone number or email — we\u2019ll show the email (username) linked to your account.':'Enter your registered email and phone number to verify your identity, then set a new password.'}</p>
+    ${isUser?`
+    <div class="fg"><label>Phone or Email</label><input type="text" id="rec-find" placeholder="+91 9XXXXXXXXX or you@email.com"></div>
+    <button class="abtn" onclick="doFindUsername()">Find Account →</button>
+    `:`
+    <div class="fg"><label>Registered Email</label><input type="email" id="rec-em" placeholder="you@email.com"></div>
+    <div class="fg"><label>Registered Phone</label><input type="tel" id="rec-ph" placeholder="+91 9XXXXXXXXX"></div>
+    <div class="fg"><label>New Password</label><input type="password" id="rec-newpw" placeholder="Min 6 characters"></div>
+    <button class="abtn" onclick="doResetPassword()">Reset Password →</button>
+    `}
+    <div id="recov-result" style="margin-top:.9rem;font-size:.85rem;line-height:1.6;"></div>
+    <p class="asw" style="margin-top:1rem;"><a onclick="document.getElementById('recovModal').remove();document.body.style.overflow='';">Close</a></p>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal){modal.remove();document.body.style.overflow='';}});
+  attachFieldClearers();
+}
+function doFindUsername(){
+  const q=v('rec-find').toLowerCase();
+  const r=$('recov-result');
+  if(!q) return toast('Please enter your phone or email.','err');
+  if(q==='admin@servenow.in'||q.replace(/\D/g,'')==='9400099999'){
+    r.innerHTML=`<p style="color:var(--gr);">✅ The admin username is:<br><strong style="color:var(--bl);">admin@servenow.in</strong></p>`;return;
+  }
+  const u=DB.users().find(u=>u.email.toLowerCase()===q||(u.phone.replace(/\D/g,'')&&q.replace(/\D/g,'')&&u.phone.replace(/\D/g,'').slice(-10)===q.replace(/\D/g,'').slice(-10)));
+  if(!u){r.innerHTML='<p style="color:var(--rd);">No account found with that phone number or email.</p>';return;}
+  r.innerHTML=`<p style="color:var(--gr);">✅ Found it! Your username (login email) is:<br><strong style="color:var(--acc);">${u.email}</strong></p>`;
+}
+function doResetPassword(){
+  const em=v('rec-em').toLowerCase(),ph=v('rec-ph'),npw=v('rec-newpw');
+  const r=$('recov-result');
+  if(!em||!ph||!npw) return toast('Please fill all fields.','err');
+  if(npw.length<6) return toast('Password must be 6+ characters.','err');
+  if(em==='admin@servenow.in'){r.innerHTML='<p style="color:var(--rd);">Admin password cannot be reset here. Please contact the super admin.</p>';return;}
+  const u=DB.users().find(u=>u.email.toLowerCase()===em);
+  if(!u||u.phone.replace(/\D/g,'').slice(-10)!==ph.replace(/\D/g,'').slice(-10)){r.innerHTML='<p style="color:var(--rd);">That email & phone combination doesn\u2019t match our records.</p>';return;}
+  DB.upUser(u.email,{pass:npw});
+  r.innerHTML='<p style="color:var(--gr);">✅ Password updated! You can now sign in with your new password.</p>';
+  toast('✅ Password reset successfully!');
+}
+
+// ══════════════════════════════════════
 // NOTIFICATIONS
 // ══════════════════════════════════════
 function sendNotification({type,to,phone,name,bkId,svc,sub,date,time,addr,status,msg}){
@@ -1447,7 +1515,9 @@ function sendNotification({type,to,phone,name,bkId,svc,sub,date,time,addr,status
 
 function buildNotifMsg({name,bkId,svc,sub,date,time,addr,status}){
   if(status){
-    return `Hello ${name}! 🙏\nYour ServeNow booking ${bkId} for *${svc}* has been updated to *${status.toUpperCase()}*.\n📅 ${date} at ${time}\n📍 ${addr}\n\nThank you for choosing ServeNow! – Ariyalur & Perambalur`;
+    let m=`Hello ${name}! 🙏\nYour ServeNow booking ${bkId} for *${svc}* has been updated to *${status.toUpperCase()}*.\n📅 ${date} at ${time}\n📍 ${addr}\n\nThank you for choosing ServeNow! – Ariyalur & Perambalur`;
+    if(status==='completed') m+=`\n\n⭐ How was our service? Please open ServeNow → My Orders and tap "Rate & Review" to share your feedback!`;
+    return m;
   }
   return `Hello ${name}! 🙏\nYour booking is *CONFIRMED*!\n\n📋 Booking ID: *${bkId}*\n🛠️ Service: *${svc}*\n📝 Type: ${sub}\n📅 Date: ${date} at ${time}\n📍 Address: ${addr}\n\nTrack your order at ServeNow. – Ariyalur & Perambalur`;
 }
@@ -1479,7 +1549,9 @@ function renderHome(){
       <div class="svc-foot"><span class="svc-from">${s.from}</span><button class="svc-arr">→</button></div>
       <div class="svc-cnt">${s.subs.length} services available</div>
     </div>`).join('');
-  $('homeRevGrid').innerHTML=REVIEWS.map(r=>`
+  const featured=DB.reviews().filter(r=>r.featured);
+  const revSource=featured.length?featured.map(r=>({s:r.rating,t:r.text,n:r.uname,l:'',i:(r.uname||'U ?').trim().split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()})):REVIEWS;
+  $('homeRevGrid').innerHTML=revSource.map(r=>`
     <div class="rev-card">
       <div class="rev-stars">${Array(r.s).fill('<span class="rev-star">★</span>').join('')}${Array(5-r.s).fill('<span class="rev-star" style="opacity:.2">★</span>').join('')}</div>
       <p class="rev-txt">"${r.t}"</p>
@@ -1561,7 +1633,6 @@ function buildSvcPage(){
     <div class="map-section">
       <div class="map-box"><div id="pickupMapDiv"><div class="map-placeholder" onclick="initPickupMap()"><div class="mpic">🗺️</div><div>Tap to activate map</div></div></div></div>
       <div class="map-actions">
-        <button class="gps-btn" onclick="getGPS('b-pickup',pickupMap?.map,pickupMap?.marker)">📡 Use My Location</button>
         <button class="gps-btn" onclick="initPickupMap()">🗺️ Open Map</button>
       </div>
       <div class="map-input-wrap fg" style="margin-bottom:.5rem;">
@@ -1589,7 +1660,6 @@ function buildSvcPage(){
     <div class="map-section">
       <div class="map-box"><div id="svcMapDiv"><div class="map-placeholder" onclick="initSvcMap()"><div class="mpic">🗺️</div><div>Tap to pin your location on map</div></div></div></div>
       <div class="map-actions">
-        <button class="gps-btn" onclick="getGPS('b-addr',svcMap?.map,svcMap?.marker)">📡 Use My Location</button>
         <button class="gps-btn" onclick="initSvcMap()">🗺️ Open Map</button>
       </div>
       <div class="map-input-wrap fg">
@@ -1793,6 +1863,8 @@ function custFilt(f,el){
   renderCustOrders(f);
 }
 function custRow(b){
+  const reviewed=DB.reviews().some(r=>r.bkId===b.id);
+  const reviewBtn=b.status==='completed'?(reviewed?'<span style="font-size:.72rem;color:var(--gr);font-weight:700;">✅ Reviewed</span>':`<button class="abt" style="color:var(--acc);border-color:rgba(249,115,22,.4);font-weight:700;" onclick="openReviewModal('${b.id}')">⭐ Rate &amp; Review</button>`):'';
   return`<div class="br">
     <div><div class="br-svc">${b.svc}</div><div class="br-sub">${b.sub}</div>
     <div class="br-meta">📅 ${b.date} at ${b.time} &nbsp;|&nbsp; 📍 ${b.addr}</div>
@@ -1801,8 +1873,52 @@ function custRow(b){
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.45rem;">
       <span class="badge b-${b.status}">${b.status==='inprogress'?'In Progress':b.status}</span>
       <button class="abt" onclick="qTrack('${b.id}')">🔍 Track</button>
+      ${reviewBtn}
     </div>
   </div>`;
+}
+
+// ══════════════════════════════════════
+// RATING & REVIEW
+// ══════════════════════════════════════
+let _revStar=5;
+function openReviewModal(bkId){
+  const b=DB.findBk(bkId);if(!b)return;
+  document.body.style.overflow='hidden';
+  const old=document.getElementById('reviewModal');if(old)old.remove();
+  _revStar=5;
+  const modal=document.createElement('div');
+  modal.id='reviewModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:440px;padding:1.6rem;">
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:.3rem;">⭐ Rate Your Experience</h2>
+    <p style="color:var(--mu);font-size:.8rem;margin-bottom:1rem;">${b.svc} — ${b.sub}</p>
+    <div id="star-pick" style="font-size:2.2rem;letter-spacing:.25rem;margin-bottom:1.1rem;">${[1,2,3,4,5].map(i=>`<span data-v="${i}" onclick="setRevStar(${i})" style="opacity:.25;color:#f97316;cursor:pointer;">★</span>`).join('')}</div>
+    <div class="fg"><label>Your Review</label><textarea id="rev-txt" placeholder="Tell others about your experience…"></textarea></div>
+    <div style="display:flex;gap:.8rem;margin-top:1rem;">
+      <button onclick="document.getElementById('reviewModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;font-size:.88rem;">Cancel</button>
+      <button onclick="submitReview('${bkId}')" style="flex:2;background:var(--acc);color:#fff;border:none;padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.88rem;">Submit Review</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  setRevStar(5);
+  modal.addEventListener('click',e=>{if(e.target===modal){modal.remove();document.body.style.overflow='';}});
+  attachFieldClearers();
+}
+function setRevStar(n){
+  _revStar=n;
+  document.querySelectorAll('#star-pick span').forEach(s=>{s.style.opacity=(+s.dataset.v<=n)?'1':'.25';});
+}
+function submitReview(bkId){
+  const b=DB.findBk(bkId);if(!b)return;
+  const txt=v('rev-txt');
+  if(!txt) return toast('Please write a short review.','err');
+  DB.addReview({bkId,uemail:b.uemail,uname:b.uname,svc:b.svc,rating:_revStar,text:txt});
+  const m=document.getElementById('reviewModal');if(m)m.remove();
+  document.body.style.overflow='';
+  toast('✅ Thank you for your feedback!');
+  renderCustOv();
+  if($('cp-orders').classList.contains('on')) renderCustOrders('all');
 }
 function renderTrkList(){
   const bk=DB.myBks(CU.email);
@@ -1853,6 +1969,8 @@ function buildAdminNav(){
   const bks=DB.bks();
   const pending=bks.filter(b=>b.status==='pending').length;
   const notifs=DB.notifs().filter(n=>!n.read).length;
+  const unreadContacts=DB.contacts().filter(c=>!c.read).length;
+  const newReviews=DB.reviews().filter(r=>!r.approved&&!r.rejected).length;
   const perSvc=SVCS.map(s=>{
     const cnt=bks.filter(b=>b.svc===s.name&&b.status==='pending').length;
     return{...s,pending:cnt};
@@ -1862,6 +1980,8 @@ function buildAdminNav(){
     <div class="sb-lnk on" onclick="apanel('dash',this)"><span class="sb-ic">📊</span> Dashboard</div>
     <div class="sb-lnk" onclick="apanel('bookings',this)"><span class="sb-ic">📋</span> All Bookings${pending>0?`<span class="sb-badge">${pending}</span>`:''}</div>
     <div class="sb-lnk" onclick="apanel('customers',this)"><span class="sb-ic">👥</span> Customers</div>
+    <div class="sb-lnk" onclick="apanel('contacts',this)"><span class="sb-ic">✉️</span> Contact Messages${unreadContacts>0?`<span class="sb-badge">${unreadContacts}</span>`:''}</div>
+    <div class="sb-lnk" onclick="apanel('reviews',this)"><span class="sb-ic">⭐</span> Reviews${newReviews>0?`<span class="sb-badge">${newReviews}</span>`:''}</div>
     <div class="sb-lnk" onclick="apanel('notifications',this)"><span class="sb-ic">🔔</span> Notifications${notifs>0?`<span class="sb-badge">${Math.min(notifs,99)}</span>`:''}</div>
     <div class="sb-sep"></div>
     <div class="sb-sec-label">By Service</div>
@@ -1896,6 +2016,8 @@ function apanel(n,el){
   if(n==='dash') renderAdminDash();
   if(n==='bookings') renderAdminBks();
   if(n==='customers') renderAdminCusts();
+  if(n==='contacts') renderAdminContacts();
+  if(n==='reviews') renderAdminReviews();
   if(n==='notifications') renderAdminNotifs();
   if(n==='services') renderAdminSvcs();
   SVCS.forEach(s=>{if(n==='svc-'+s.id) renderSvcPanel(s.id,s.name);});
@@ -1952,7 +2074,16 @@ function renderAdminBks(){
   $('a-bk-list').innerHTML=bks.map(adminRow).join('')||empBox('No bookings match filters.');
 }
 function aFilt(f,el){adminSFilt=f;document.querySelectorAll('#ap-bookings .ftab').forEach(t=>t.classList.remove('on'));el.classList.add('on');renderAdminBks();}
-function setDFilt(t,el){adminDFilt=t;document.querySelectorAll('.dbar-btn').forEach(b=>b.classList.remove('on'));if(el)el.classList.add('on');renderAdminBks();}
+function setDFilt(t,el){adminDFilt=t;document.querySelectorAll('.dbar-btn').forEach(b=>{if(b.id!=='clearFiltBtn')b.classList.remove('on');});if(el)el.classList.add('on');renderAdminBks();}
+function clearAdminFilters(){
+  adminSFilt='all';adminDFilt='all';
+  document.querySelectorAll('#ap-bookings .ftab').forEach((t,i)=>t.classList.toggle('on',i===0));
+  document.querySelectorAll('.dbar-btn').forEach(b=>{if(b.id!=='clearFiltBtn')b.classList.toggle('on',b.textContent.trim()==='All');});
+  if($('df-from'))$('df-from').value='';
+  if($('df-to'))$('df-to').value='';
+  renderAdminBks();
+  toast('Filters cleared.');
+}
 
 function adminRow(b){
   return`<div class="br">
@@ -2146,6 +2277,7 @@ function renderAdminCusts(){
         <div class="cust-detail-item"><label>Total Spent (Est.)</label><span>${myBks.filter(b=>b.status==='completed').length} completed jobs</span></div>
         <div class="cust-detail-item"><label>Last Booking</label><span>${lastBk?lastBk.svc+' on '+lastBk.date:'—'}</span></div>
         <div class="cust-detail-item"><label>Active Bookings</label><span>${myBks.filter(b=>['pending','confirmed','inprogress'].includes(b.status)).length}</span></div>
+        <div class="cust-detail-item"><label>Reviews Given</label><span>${DB.reviews().filter(r=>r.uemail===u.email).length}</span></div>
       </div>
       <div class="cust-actions">
         <button class="abt wa" onclick="openWhatsApp('${u.phone}','Hello ${u.fn}! This is ServeNow. How can we help you today?')">💬 WhatsApp</button>
@@ -2160,6 +2292,55 @@ function viewCustBks(email){
   apanel('bookings',null);
   $('a-bk-list').innerHTML=bks.map(adminRow).join('')||empBox('No bookings for this customer.');
   $('a-bk-cnt').textContent=bks.length+' Bookings for '+email;
+}
+
+// Contact Us messages
+function renderAdminContacts(){
+  const cs=DB.contacts();
+  $('a-ct-cnt').textContent=cs.length+' Message'+(cs.length!==1?'s':'');
+  $('a-ct-list').innerHTML=cs.length?cs.map(c=>`<div class="br">
+    <div><div class="br-svc">${c.name}${!c.read?' <span class="badge b-pending" style="margin-left:.4rem;">New</span>':''}</div>
+    <div class="br-sub">${c.email}</div>
+    <div class="br-meta" style="white-space:pre-wrap;line-height:1.6;">${c.msg}</div>
+    <div class="br-id">${c.id} • ${c.time}</div></div>
+    <div class="act-row">
+      <button class="abt" style="color:var(--bl);border-color:rgba(59,130,246,.35);" onclick="window.open('mailto:${c.email}?subject=Re: Your message to ServeNow')">📧 Reply by Email</button>
+      <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="delContact('${c.id}')">🗑️ Delete</button>
+    </div>
+  </div>`).join(''):empBox('No contact messages yet.');
+  // mark all as read once viewed
+  if(cs.some(c=>!c.read)){cs.forEach(c=>c.read=true);DB.s('contacts',cs);buildAdminNav();}
+}
+function delContact(id){
+  DB.s('contacts',DB.contacts().filter(c=>c.id!==id));
+  renderAdminContacts();buildAdminNav();toast('Message deleted.');
+}
+
+// Ratings & Reviews
+function renderAdminReviews(){
+  const rs=DB.reviews();
+  $('a-rv-cnt').textContent=rs.length+' Review'+(rs.length!==1?'s':'');
+  $('a-rv-list').innerHTML=rs.length?rs.map(r=>`<div class="br">
+    <div><div class="br-svc" style="color:var(--acc);">${'★'.repeat(r.rating)}${'☆'.repeat(5-r.rating)}</div>
+    <div class="br-sub">${r.svc}</div>
+    <div class="br-meta">👤 ${r.uname} &nbsp;|&nbsp; 📧 ${r.uemail}</div>
+    <div class="br-meta" style="white-space:pre-wrap;line-height:1.6;">"${r.text}"</div>
+    <div class="br-id">${r.id} • ${r.time}${r.bkId?' • '+r.bkId:''}${r.featured?' • ⭐ Shown on Home Page':''}</div></div>
+    <div class="act-row">
+      <button class="abt" style="color:${r.featured?'var(--rd)':'var(--gr)'};border-color:${r.featured?'rgba(239,68,68,.35)':'rgba(16,185,129,.4)'};font-weight:700;" onclick="toggleFeatureReview('${r.id}')">${r.featured?'✕ Remove from Home':'✅ Show on Home Page'}</button>
+      <button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);" onclick="delReview('${r.id}')">🗑️ Delete</button>
+    </div>
+  </div>`).join(''):empBox('No reviews submitted yet.');
+}
+function toggleFeatureReview(id){
+  const r=DB.reviews().find(x=>x.id===id);if(!r)return;
+  DB.upReview(id,{featured:!r.featured,approved:true});
+  renderAdminReviews();renderHome();
+  toast(r.featured?'Removed from home page.':'✅ Now showing on the home page!');
+}
+function delReview(id){
+  DB.s('reviews',DB.reviews().filter(r=>r.id!==id));
+  renderAdminReviews();renderHome();toast('Review deleted.');
 }
 
 function renderAdminNotifs(){
@@ -2304,7 +2485,9 @@ function doPubTrack(){
 }
 function sendContact(){
   if(!v('c-nm')||!v('c-em')||!v('c-mg')) return toast('Please fill all fields.','err');
+  DB.addContact({name:v('c-nm'),email:v('c-em'),msg:v('c-mg')});
   $('c-nm').value='';$('c-em').value='';$('c-mg').value='';
+  if(isAdmin) buildAdminNav();
   toast('✅ Message sent! We will reply within 24 hours.');
 }
 
