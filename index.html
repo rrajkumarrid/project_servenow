@@ -7,7 +7,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;800;900&family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
 <!-- Leaflet Maps (free, no API key) -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ══════════════════════════════════════
+// UTILITY FUNCTIONS (must be first)
+// ══════════════════════════════════════
+function iso(d){return d instanceof Date?d.toISOString().split('T')[0]:new Date(d).toISOString().split('T')[0];}
+function fmtDT(d){return new Date(d).toLocaleString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
+function fmtDate(d){return new Date(d).toLocaleDateString('en-IN');}
+function v(id){return document.getElementById(id)?.value?.trim()||'';}
+function $(id){return document.getElementById(id);}
+function empBox(msg){return`<div class="empty-s"><div class="empty-ic">📭</div><p>${msg}</p></div>`;}
+
 // ══════════════════════════════════════
 // EMPLOYEES DATA & FUNCTIONS
 // ══════════════════════════════════════
@@ -1785,13 +1796,6 @@ const DB={
     demo.forEach(b=>DB.addBk(b));
   }
 })();
-
-function iso(d){return d instanceof Date?d.toISOString().split('T')[0]:new Date(d).toISOString().split('T')[0];}
-function fmtDT(d){return new Date(d).toLocaleString('en-IN',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'});}
-function fmtDate(d){return new Date(d).toLocaleDateString('en-IN');}
-function v(id){return document.getElementById(id)?.value?.trim()||'';}
-function $(id){return document.getElementById(id);}
-function empBox(msg){return`<div class="empty-s"><div class="empty-ic">📭</div><p>${msg}</p></div>`;}
 
 // ══════════════════════════════════════
 // STATE
