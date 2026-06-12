@@ -79,12 +79,58 @@ function epanel(n, el) {
   if (n === 'overview') renderEmpOverview();
   if (n === 'mytasks') renderEmpTasks('all');
   if (n === 'completed') renderEmpCompleted();
+  if (n === 'notifications') renderEmpNotifs();
   if (n === 'profile') {}
 }
 
 function getMyAssignedBks() {
   if (!CUR_EMP) return [];
   return DB.bks().filter(b => b.assignedTo && b.assignedTo.toLowerCase().includes(CUR_EMP.name.toLowerCase().split(' ')[0].toLowerCase()));
+}
+
+function getEmpSeenBks() {
+  if (!CUR_EMP) return [];
+  try { return JSON.parse(localStorage.getItem('sn_emp_seen_' + CUR_EMP.id) || '[]'); } catch { return []; }
+}
+function markEmpBksSeen() {
+  if (!CUR_EMP) return;
+  const ids = getMyAssignedBks().map(b => b.id);
+  localStorage.setItem('sn_emp_seen_' + CUR_EMP.id, JSON.stringify(ids));
+  updateEmpNotifBadge();
+}
+function getEmpNewBks() {
+  const seen = getEmpSeenBks();
+  return getMyAssignedBks().filter(b => !seen.includes(b.id) && b.status !== 'completed' && b.status !== 'cancelled');
+}
+function updateEmpNotifBadge() {
+  const count = getEmpNewBks().length;
+  const badge = $('emp-notif-badge');
+  const taskBadge = $('emp-task-badge');
+  if (badge) { badge.style.display = count > 0 ? 'inline-block' : 'none'; badge.textContent = count; }
+  if (taskBadge) { taskBadge.style.display = count > 0 ? 'inline-block' : 'none'; taskBadge.textContent = count; }
+}
+function renderEmpNotifs() {
+  const newBks = getEmpNewBks();
+  const allBks = getMyAssignedBks();
+  markEmpBksSeen();
+  const el = $('emp-notif-list');
+  if (!el) return;
+  el.innerHTML = newBks.length ? newBks.map(b => `<div class="br" style="border-left:3px solid var(--acc);">
+    <div>
+      <div style="background:var(--acc);color:#fff;font-size:.64rem;font-weight:800;padding:.1rem .4rem;border-radius:4px;display:inline-block;margin-bottom:.3rem;">🔔 NEW ASSIGNMENT</div>
+      <div class="br-svc">${b.svc}</div><div class="br-sub">${b.sub}</div>
+      <div class="br-meta">👤 ${b.uname} | 📞 ${b.uphone}</div>
+      <div class="br-meta">📅 ${b.date} at ${b.time} | 📍 ${b.addr}</div>
+      ${b.lmk ? `<div class="br-meta">🏷️ ${b.lmk}</div>` : ''}
+      <div class="br-id">${b.id} • Assigned: ${b.lastModified}</div>
+      <div class="act-row">
+        <button class="abt" style="color:var(--acc);border-color:rgba(249,115,22,.4);" onclick="epanel('mytasks',document.querySelectorAll('#empSidebar .sb-lnk')[1])">📋 View Task</button>
+        <button class="abt wa" onclick="openWhatsApp('${b.uphone}','Hello ${b.uname}! I am ${CUR_EMP ? CUR_EMP.name : 'your technician'} from ServeNow. I have been assigned for your ${b.svc} on ${b.date} at ${b.time}.')">💬 Contact Customer</button>
+      </div>
+    </div>
+    <span class="badge b-${b.status}">${b.status === 'inprogress' ? 'In Progress' : b.status}</span>
+  </div>`).join('') + (allBks.filter(b => !newBks.find(n => n.id === b.id)).length ? `<div style="padding:.8rem 1.4rem;border-top:1px solid var(--bdr);"><p style="color:var(--mu);font-size:.78rem;">✅ All previous assignments already seen.</p></div>` : '')
+  : empBox('No new assignments. All caught up! 🎉');
 }
 
 function renderEmpOverview() {
@@ -99,8 +145,7 @@ function renderEmpOverview() {
     { ic: '🏆', n: bks.filter(b => b.status === 'completed').length, l: 'Completed' },
   ];
   $('emp-kpis').innerHTML = kpis.map(k => `<div class="kpi"><div class="kpi-ic">${k.ic}</div><div class="kpi-n">${k.n}</div><div class="kpi-l">${k.l}</div></div>`).join('');
-  const badge = $('emp-task-badge');
-  if (badge) { badge.style.display = pending > 0 ? 'inline-block' : 'none'; badge.textContent = pending; }
+  updateEmpNotifBadge();
   $('emp-today-tasks').innerHTML = todayBks.length ? todayBks.map(empTaskRow).join('') : empBox("No tasks for today. Enjoy your day! 🌟");
 }
 
@@ -137,7 +182,8 @@ function empTaskRow(b) {
       <div class="br-id">${b.id} • ${b.created}</div>
       <div class="act-row">
         ${canStart ? `<button class="abt" style="background:rgba(249,115,22,.12);border-color:rgba(249,115,22,.4);color:var(--acc);font-weight:700;" onclick="empUpdateStatus('${b.id}','inprogress')">🔧 Start Work</button>` : ''}
-        ${canComplete ? `<button class="abt" style="background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.4);color:var(--gr);font-weight:700;" onclick="empUpdateStatus('${b.id}','completed')">✅ Mark Done</button>` : ''}
+        ${canComplete ? `<button class="abt" style="background:rgba(16,185,129,.12);border-color:rgba(16,185,129,.4);color:var(--gr);font-weight:700;" onclick="empUpdateStatus('${b.id}','completed')">🏆 Close Booking</button>` : ''}
+        ${b.status === 'completed' && b.grandTotal ? `<button class="abt" style="color:var(--gr);border-color:rgba(16,185,129,.35);" onclick="downloadInvoice('${b.id}')">⬇ Invoice</button>` : ''}
         <button class="abt wa" onclick="openWhatsApp('${b.uphone}','Hello ${b.uname}! This is ${CUR_EMP ? CUR_EMP.name : 'your technician'} from ServeNow. I am assigned for your ${b.svc} on ${b.date} at ${b.time}. I will be at your location soon.')">💬 Contact Customer</button>
         <button class="abt" style="color:var(--bl);border-color:rgba(59,130,246,.35);" onclick="getDirections('${b.addr.replace(/'/g, "\'")}','${b.lmk ? b.lmk.replace(/'/g, "\'") : ''}')">🗺️ Navigate</button>
       </div>
@@ -147,12 +193,156 @@ function empTaskRow(b) {
 }
 
 function empUpdateStatus(bkId, status) {
+  if (status === 'completed') {
+    openEmpCloseModal(bkId);
+    return;
+  }
   DB.upBk(bkId, { status });
   const b = DB.findBk(bkId);
   if (b) sendNotification({ type: 'update', to: b.uemail, phone: b.uphone, name: b.uname, bkId: b.id, svc: b.svc, sub: b.sub, date: b.date, time: b.time, addr: b.addr, status });
   toast(status === 'inprogress' ? '🔧 Work started! Customer notified.' : '✅ Job completed! Great work!');
   renderEmpOverview();
   renderEmpTasks('all');
+}
+
+function getSubCatalogPrice(svc, sub) {
+  const s = SVCS.find(x => x.name === svc);
+  if (!s) return null;
+  const subObj = s.subs.find(x => x.name === sub);
+  if (!subObj) return null;
+  const raw = String(subObj.price).replace(/[^\d]/g, '');
+  return raw ? parseInt(raw) : null;
+}
+
+function openEmpCloseModal(bkId) {
+  const bk = DB.findBk(bkId); if (!bk) return;
+  const catalogPrice = getSubCatalogPrice(bk.svc, bk.sub);
+  const old = document.getElementById('empCloseModal'); if (old) old.remove();
+  document.body.style.overflow = 'hidden';
+  const modal = document.createElement('div');
+  modal.id = 'empCloseModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;';
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:upIn .3s ease;">
+    <div style="background:rgba(16,185,129,.1);padding:1.2rem 1.5rem;border-bottom:1px solid var(--bdr);border-radius:20px 20px 0 0;">
+      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--gr);">🏆 Close Booking</h2>
+      <p style="color:var(--mu);font-size:.78rem;margin-top:.2rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
+    </div>
+    <div style="padding:1.4rem;">
+      ${catalogPrice ? `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:.9rem 1.1rem;margin-bottom:1rem;">
+        <p style="font-size:.8rem;color:var(--gr);font-weight:700;margin-bottom:.2rem;">📋 Catalog Price</p>
+        <p style="font-size:1.1rem;font-weight:900;color:var(--gr);">₹${catalogPrice.toLocaleString('en-IN')}</p>
+        <p style="font-size:.72rem;color:var(--mu);margin-top:.2rem;">This is the standard price from catalogue. You can adjust below.</p>
+      </div>` : ''}
+      <div class="fg"><label>Base Service Amount (₹) <span style="color:var(--rd);">*</span></label>
+        <input type="number" id="eclose-base" placeholder="Enter base amount" min="0" value="${catalogPrice || ''}" oninput="calcEmpCloseTotal()">
+      </div>
+      <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;">
+          <p style="font-size:.78rem;font-weight:700;color:var(--acc);">➕ Additional Charges</p>
+          <button onclick="addEmpCharge()" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:var(--acc);padding:.2rem .65rem;border-radius:6px;font-size:.73rem;cursor:pointer;font-family:var(--fb);font-weight:700;">+ Add Charge</button>
+        </div>
+        <div id="emp-extra-charges"></div>
+        <p style="font-size:.7rem;color:var(--mu);margin-top:.4rem;">e.g. Extra parts, travel, materials used</p>
+      </div>
+      <div class="fg"><label>GST Rate (%)</label>
+        <select id="eclose-gst" onchange="calcEmpCloseTotal()">
+          <option value="0">No GST (0%)</option>
+          <option value="5">5%</option>
+          <option value="12">12%</option>
+          <option value="18" selected>18%</option>
+          <option value="28">28%</option>
+        </select>
+      </div>
+      <div id="eclose-calc" style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;display:none;">
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--mu);">Base Amount:</span><span id="eclose-base-disp">—</span></div>
+        <div id="eclose-extra-disp"></div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--mu);">Sub-total:</span><span id="eclose-sub">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--yl);">GST:</span><span id="eclose-gst-amt" style="color:var(--yl);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--gr);">GRAND TOTAL:</span><span id="eclose-grand" style="color:var(--gr);">—</span></div>
+      </div>
+      <div style="display:flex;gap:.7rem;">
+        <button onclick="document.getElementById('empCloseModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
+        <button onclick="confirmEmpClose('${bkId}')" style="flex:2;background:var(--gr);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">✅ Confirm &amp; Close Booking</button>
+      </div>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); document.body.style.overflow = ''; } });
+  attachFieldClearers();
+  setTimeout(calcEmpCloseTotal, 100);
+}
+
+let _empChargeCount = 0;
+function addEmpCharge() {
+  const i = ++_empChargeCount;
+  const cont = $('emp-extra-charges');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.id = 'emp-chg-' + i;
+  row.style.cssText = 'display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center;';
+  row.innerHTML = `<input type="text" placeholder="Charge name (e.g. Gas refill)" id="emp-chg-nm-${i}" style="flex:2;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcEmpCloseTotal()">
+    <input type="number" placeholder="₹" id="emp-chg-amt-${i}" min="0" style="flex:1;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcEmpCloseTotal()">
+    <button onclick="document.getElementById('emp-chg-${i}').remove();calcEmpCloseTotal();" style="background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.9rem;flex-shrink:0;">✕</button>`;
+  cont.appendChild(row);
+}
+
+function getEmpExtraCharges() {
+  const charges = [];
+  document.querySelectorAll('[id^="emp-chg-"]:not([id*="-nm-"]):not([id*="-amt-"])').forEach(row => {
+    const i = row.id.replace('emp-chg-', '');
+    const nm = document.getElementById('emp-chg-nm-' + i)?.value?.trim();
+    const amt = parseFloat(document.getElementById('emp-chg-amt-' + i)?.value) || 0;
+    if (nm && amt > 0) charges.push({ name: nm, amount: amt });
+  });
+  return charges;
+}
+
+function calcEmpCloseTotal() {
+  const base = parseFloat($('eclose-base')?.value) || 0;
+  const gst = parseFloat($('eclose-gst')?.value) || 0;
+  const extras = getEmpExtraCharges();
+  const extraTotal = extras.reduce((a, c) => a + c.amount, 0);
+  const sub = base + extraTotal;
+  const gstAmt = Math.round(sub * gst / 100);
+  const grand = sub + gstAmt;
+  const calc = $('eclose-calc');
+  if (!calc) return;
+  if (base > 0 || sub > 0) {
+    calc.style.display = 'block';
+    $('eclose-base-disp').textContent = '₹' + base.toLocaleString('en-IN');
+    const extraDisp = $('eclose-extra-disp');
+    if (extraDisp) extraDisp.innerHTML = extras.map(c => `<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.25rem;"><span style="color:var(--mu);">+ ${c.name}:</span><span style="color:var(--acc);">₹${c.amount.toLocaleString('en-IN')}</span></div>`).join('');
+    $('eclose-sub').textContent = '₹' + sub.toLocaleString('en-IN');
+    $('eclose-gst-amt').textContent = '₹' + gstAmt.toLocaleString('en-IN') + ' (' + gst + '%)';
+    $('eclose-grand').textContent = '₹' + grand.toLocaleString('en-IN');
+  } else {
+    calc.style.display = 'none';
+  }
+}
+
+function confirmEmpClose(bkId) {
+  const base = parseFloat($('eclose-base')?.value) || 0;
+  if (!base) { shakeField('eclose-base'); return toast('Please enter the base service amount.', 'err'); }
+  const gst = parseFloat($('eclose-gst')?.value) || 0;
+  const extras = getEmpExtraCharges();
+  const extraTotal = extras.reduce((a, c) => a + c.amount, 0);
+  const sub = base + extraTotal;
+  const gstAmt = Math.round(sub * gst / 100);
+  const grand = sub + gstAmt;
+  DB.upBk(bkId, {
+    status: 'completed', totalAmount: base, extraCharges: extras, extraTotal,
+    gstPct: gst, gstAmount: gstAmt, grandTotal: grand,
+    completedOn: fmtDT(new Date()), closedByEmp: CUR_EMP ? CUR_EMP.name : '',
+    closedByEmpId: CUR_EMP ? CUR_EMP.empId : ''
+  });
+  const bk = DB.findBk(bkId);
+  document.getElementById('empCloseModal')?.remove();
+  document.body.style.overflow = '';
+  if (bk) sendNotification({ type: 'update', to: bk.uemail, phone: bk.uphone, name: bk.uname, bkId: bk.id, svc: bk.svc, sub: bk.sub, date: bk.date, time: bk.time, addr: bk.addr, status: 'completed' });
+  toast('✅ Booking closed! Invoice ready.');
+  renderEmpOverview();
+  renderEmpTasks('all');
+  if ($('emp-done-list')) renderEmpCompleted();
 }
 
 function empChangePwd() {
@@ -421,6 +611,11 @@ buildInvoiceHTML = function(bk, amount, gst) {
   const orderDate = bk.created ? bk.created.split(',')[0].trim() : bk.date;
   const qrData = encodeURIComponent(JSON.stringify({ id: bk.id, svc: bk.svc, cust: bk.uname, date: bk.date, status: bk.status }));
   const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${qrData}`;
+  const extras = bk.extraCharges || [];
+  const extraTotal = bk.extraTotal || 0;
+  const sub = amount ? (amount + extraTotal) : null;
+  const gstAmt2 = sub && gst ? Math.round(sub * gst / 100) : 0;
+  const total2 = sub ? (sub + gstAmt2) : null;
   return `<!DOCTYPE html><html><head><meta charset="UTF-8">
 <style>body{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;max-width:700px;margin:0 auto;padding:2rem;}
 .inv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #f97316;padding-bottom:1rem;margin-bottom:1.5rem;}
@@ -458,19 +653,26 @@ buildInvoiceHTML = function(bk, amount, gst) {
   <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Service Address</div><div style="font-size:.83rem;color:#555;">${bk.addr}</div>${bk.lmk ? `<div style="font-size:.8rem;color:#888;">Landmark: ${bk.lmk}</div>` : ''}</div>
 </div>
 <table class="inv-table">
-  <thead><tr><th>Service</th><th>Sub-Service</th><th>Order Date</th><th>Service Date &amp; Time</th><th>Base Amount</th></tr></thead>
+  <thead><tr><th>Service</th><th>Sub-Service</th><th>Order Date</th><th>Service Date &amp; Time</th><th>Technician</th><th>Base Amount</th></tr></thead>
   <tbody><tr>
     <td>${bk.svc}</td>
     <td>${bk.sub}</td>
     <td>${orderDate}</td>
     <td>${bk.date} at ${bk.time}</td>
+    <td>${bk.closedByEmp || bk.assignedTo || '—'}</td>
     <td>${amount ? '₹' + amount.toLocaleString('en-IN') : '—'}</td>
   </tr></tbody>
 </table>
-${amount ? `<div class="inv-total">
-  <div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;"><span>Sub-total:</span><span>₹${amount.toLocaleString('en-IN')}</span></div>
-  ${gst ? `<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;color:#d97706;"><span>GST (${gst}%):</span><span>₹${gstAmt.toLocaleString('en-IN')}</span></div>` : ''}
-  <div style="display:flex;justify-content:flex-end;gap:2rem;font-size:1rem;font-weight:700;border-top:1px solid #f97316;padding-top:.4rem;color:#f97316;"><span>TOTAL:</span><span>₹${total.toLocaleString('en-IN')}</span></div>
+${extras.length ? `<table class="inv-table" style="margin-top:.5rem;">
+  <thead><tr><th colspan="2">Additional Charges</th><th>Amount</th></tr></thead>
+  <tbody>${extras.map(c => `<tr><td colspan="2">${c.name}</td><td>₹${c.amount.toLocaleString('en-IN')}</td></tr>`).join('')}</tbody>
+</table>` : ''}
+${sub ? `<div class="inv-total">
+  <div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;"><span>Base Amount:</span><span>₹${amount.toLocaleString('en-IN')}</span></div>
+  ${extras.map(c => `<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.3rem;font-size:.84rem;color:#888;"><span>+ ${c.name}:</span><span>₹${c.amount.toLocaleString('en-IN')}</span></div>`).join('')}
+  ${extraTotal > 0 ? `<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;border-top:1px solid #eee;padding-top:.3rem;"><span>Sub-total:</span><span>₹${sub.toLocaleString('en-IN')}</span></div>` : ''}
+  ${gst ? `<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;color:#d97706;"><span>GST (${gst}%):</span><span>₹${gstAmt2.toLocaleString('en-IN')}</span></div>` : ''}
+  <div style="display:flex;justify-content:flex-end;gap:2rem;font-size:1rem;font-weight:700;border-top:1px solid #f97316;padding-top:.4rem;color:#f97316;"><span>TOTAL:</span><span>₹${total2.toLocaleString('en-IN')}</span></div>
 </div>` : '<div style="background:#fff8f3;border:1px solid #f97316;border-radius:8px;padding:1rem;text-align:center;color:#d97706;font-size:.85rem;">Amount will be confirmed after service completion.</div>'}
 <div style="margin-top:1rem;"><span class="badge">Status: ${bk.status}</span></div>
 ${bk.notes ? `<div style="margin-top:.8rem;font-size:.82rem;color:#555;"><strong>Notes:</strong> ${bk.notes}</div>` : ''}
@@ -1489,6 +1691,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
           <div class="tc"><div class="tc-hdr"><h3>Status Breakdown</h3></div><div id="a-st-bar" style="padding:1.15rem;"></div></div>
         </div>
         <div class="tc"><div class="tc-hdr"><h3>Recent Bookings</h3></div><div id="a-recent"></div></div>
+        <div class="tc"><div class="tc-hdr"><h3>👷 Tickets by Employee</h3><span style="font-size:.72rem;color:var(--mu);">✅ To Do &nbsp;|&nbsp; 🔧 Active &nbsp;|&nbsp; 🏆 Done</span></div><div id="a-emp-tickets"></div></div>
       </div>
       <!-- ALL BOOKINGS -->
       <div class="dpanel" id="ap-bookings">
@@ -1658,6 +1861,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
       <div class="sb-nav">
         <div class="sb-lnk on" onclick="epanel('overview',this)"><span class="sb-ic">🏠</span> Overview</div>
         <div class="sb-lnk" onclick="epanel('mytasks',this)"><span class="sb-ic">📋</span> My Tasks <span class="sb-badge" id="emp-task-badge" style="display:none;">0</span></div>
+        <div class="sb-lnk" onclick="epanel('notifications',this)"><span class="sb-ic">🔔</span> Notifications <span class="sb-badge" id="emp-notif-badge" style="display:none;">0</span></div>
         <div class="sb-lnk" onclick="epanel('completed',this)"><span class="sb-ic">🏆</span> Completed</div>
         <div class="sb-lnk" onclick="epanel('profile',this)"><span class="sb-ic">👤</span> My Profile</div>
       </div>
@@ -1682,6 +1886,10 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
           </div>
           <div id="emp-tasks-list"></div>
         </div>
+      </div>
+      <div class="dpanel" id="ep-notifications">
+        <div class="dm-hdr"><div><h1>🔔 Notifications</h1><p>New assignments and updates</p></div></div>
+        <div class="tc"><div class="tc-hdr"><h3>New Assignments</h3></div><div id="emp-notif-list"></div></div>
       </div>
       <div class="dpanel" id="ep-completed">
         <div class="dm-hdr"><div><h1>Completed Work</h1><p>Your finished jobs</p></div></div>
@@ -2960,6 +3168,34 @@ function renderAdminDash(){
     </div>`).join('')}
   </div>`;
   $('a-recent').innerHTML=bks.slice(0,6).map(adminRow).join('')||empBox('No bookings yet.');
+  // Employee ticket counts
+  const empTicketEl = $('a-emp-tickets');
+  if (empTicketEl) {
+    const allBks = DB.bks();
+    const emps = EMP_DB.list();
+    if (emps.length) {
+      empTicketEl.innerHTML = emps.map(emp => {
+        const mine = allBks.filter(b => b.assignedTo && b.assignedTo.toLowerCase().includes(emp.name.toLowerCase().split(' ')[0].toLowerCase()));
+        const pending = mine.filter(b => b.status === 'confirmed').length;
+        const active = mine.filter(b => b.status === 'inprogress').length;
+        const done = mine.filter(b => b.status === 'completed').length;
+        return `<div style="display:flex;align-items:center;gap:.9rem;padding:.75rem 1.1rem;border-bottom:1px solid var(--bdr);cursor:pointer;" onclick="apanel('employees',null)" onmouseover="this.style.background='var(--s2)'" onmouseout="this.style.background=''">
+          <div style="width:34px;height:34px;background:linear-gradient(135deg,var(--bl),#60a5fa);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.72rem;color:#fff;flex-shrink:0;">${emp.name.split(' ').map(p=>p[0]).join('').slice(0,2).toUpperCase()}</div>
+          <div style="flex:1;min-width:0;">
+            <div style="font-weight:700;font-size:.83rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${emp.name}</div>
+            <div style="font-size:.68rem;color:var(--mu);">${emp.role}</div>
+          </div>
+          <div style="display:flex;gap:.5rem;flex-shrink:0;">
+            <span style="background:rgba(59,130,246,.12);color:var(--bl);font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:4px;">✅ ${pending}</span>
+            <span style="background:rgba(249,115,22,.12);color:var(--acc);font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:4px;">🔧 ${active}</span>
+            <span style="background:rgba(16,185,129,.12);color:var(--gr);font-size:.68rem;font-weight:700;padding:.15rem .45rem;border-radius:4px;">🏆 ${done}</span>
+          </div>
+        </div>`;
+      }).join('');
+    } else {
+      empTicketEl.innerHTML = empBox('No employees yet.');
+    }
+  }
 }
 
 // Admin booking list
@@ -2992,6 +3228,8 @@ function adminRow(b){
     <div class="br-meta">📅 ${b.date} at ${b.time} &nbsp;|&nbsp; 📍 ${b.addr}</div>
     ${b.lmk?`<div class="br-meta">🏷️ ${b.lmk}</div>`:''}
     ${b.notes?`<div class="br-meta">📝 ${b.notes}</div>`:''}
+    ${b.assignedTo?`<div class="br-meta" style="color:var(--bl);font-weight:600;">👷 Currently with: ${b.assignedTo}${b.assignedEmpId?' ('+b.assignedEmpId+')':''}</div>`:'<div class="br-meta" style="color:var(--mu);">👷 Not yet assigned</div>'}
+    ${b.closedByEmp?`<div class="br-meta" style="color:var(--gr);font-weight:600;">🏆 Closed by: ${b.closedByEmp}${b.closedByEmpId?' ('+b.closedByEmpId+')':''}</div>`:''}
     <div class="br-id">${b.id} • Created: ${b.created}${b.lastModified?' • Modified: '+b.lastModified:''}</div>
     <div class="act-row">
       ${b.status==='pending'?
@@ -3145,18 +3383,31 @@ function custDownloadInvoice(bkId){
 // ── ADMIN: COMPLETE ORDER WITH AMOUNT + GST ──
 function showCompleteModal(bkId){
   const bk=DB.findBk(bkId);if(!bk)return;
+  const catalogPrice = getSubCatalogPrice(bk.svc, bk.sub);
   const old=document.getElementById('completeModal');if(old)old.remove();
   document.body.style.overflow='hidden';
   const modal=document.createElement('div');
   modal.id='completeModal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
-  modal.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:460px;padding:0;overflow:hidden;">
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:0;overflow:hidden;">
     <div style="background:rgba(16,185,129,.1);padding:1.3rem 1.5rem;border-bottom:1px solid var(--bdr);">
-      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--gr);">🏆 Complete Order</h2>
+      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--gr);">🏆 Complete &amp; Close Booking</h2>
       <p style="color:var(--mu);font-size:.78rem;margin-top:.2rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
     </div>
     <div style="padding:1.5rem;">
-      <div class="fg"><label>Total Amount (₹) <span style="color:var(--rd);">*</span></label><input type="number" id="comp-amt" placeholder="e.g. 1500" min="0" oninput="calcCompGST()"></div>
+      ${catalogPrice ? `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:.9rem 1.1rem;margin-bottom:1rem;">
+        <p style="font-size:.8rem;color:var(--gr);font-weight:700;">📋 Catalog Price: <span style="font-size:1.05rem;">₹${catalogPrice.toLocaleString('en-IN')}</span></p>
+        <p style="font-size:.7rem;color:var(--mu);margin-top:.2rem;">Pre-filled from catalogue. Adjust if needed.</p>
+      </div>` : ''}
+      <div class="fg"><label>Base Service Amount (₹) <span style="color:var(--rd);">*</span></label><input type="number" id="comp-amt" placeholder="e.g. 1500" min="0" value="${catalogPrice || ''}" oninput="calcCompGST()"></div>
+      <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;">
+          <p style="font-size:.78rem;font-weight:700;color:var(--acc);">➕ Additional Charges</p>
+          <button onclick="addAdminCharge()" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:var(--acc);padding:.2rem .65rem;border-radius:6px;font-size:.73rem;cursor:pointer;font-family:var(--fb);font-weight:700;">+ Add Charge</button>
+        </div>
+        <div id="admin-extra-charges"></div>
+        <p style="font-size:.7rem;color:var(--mu);margin-top:.4rem;">e.g. Parts, materials, travel</p>
+      </div>
       <div class="fg"><label>GST Rate (%)</label>
         <select id="comp-gst" onchange="calcCompGST()">
           <option value="0">No GST (0%)</option>
@@ -3167,9 +3418,11 @@ function showCompleteModal(bkId){
         </select>
       </div>
       <div id="comp-calc" style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;display:none;">
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--mu);">Sub-total:</span><span id="comp-sub">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--mu);">Base Amount:</span><span id="comp-base-disp">—</span></div>
+        <div id="comp-extra-disp"></div>
+        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--mu);">Sub-total:</span><span id="comp-sub">—</span></div>
         <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--yl);">GST Amount:</span><span id="comp-gst-amt" style="color:var(--yl);">—</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--gr);">TOTAL:</span><span id="comp-total" style="color:var(--gr);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--gr);">GRAND TOTAL:</span><span id="comp-total" style="color:var(--gr);">—</span></div>
       </div>
       <div style="display:flex;gap:.7rem;">
         <button onclick="document.getElementById('completeModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
@@ -3178,17 +3431,49 @@ function showCompleteModal(bkId){
     </div>
   </div>`;
   document.body.appendChild(modal);
+  setTimeout(calcCompGST, 100);
+}
+
+let _adminChargeCount = 0;
+function addAdminCharge() {
+  const i = ++_adminChargeCount;
+  const cont = $('admin-extra-charges');
+  if (!cont) return;
+  const row = document.createElement('div');
+  row.id = 'admin-chg-' + i;
+  row.style.cssText = 'display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center;';
+  row.innerHTML = `<input type="text" placeholder="Charge name" id="admin-chg-nm-${i}" style="flex:2;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcCompGST()">
+    <input type="number" placeholder="₹" id="admin-chg-amt-${i}" min="0" style="flex:1;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcCompGST()">
+    <button onclick="document.getElementById('admin-chg-${i}').remove();calcCompGST();" style="background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.9rem;flex-shrink:0;">✕</button>`;
+  cont.appendChild(row);
+}
+
+function getAdminExtraCharges() {
+  const charges = [];
+  document.querySelectorAll('[id^="admin-chg-"]:not([id*="-nm-"]):not([id*="-amt-"])').forEach(row => {
+    const i = row.id.replace('admin-chg-', '');
+    const nm = document.getElementById('admin-chg-nm-' + i)?.value?.trim();
+    const amt = parseFloat(document.getElementById('admin-chg-amt-' + i)?.value) || 0;
+    if (nm && amt > 0) charges.push({ name: nm, amount: amt });
+  });
+  return charges;
 }
 function calcCompGST(){
   const amt=parseFloat($('comp-amt')?.value)||0;
   const gst=parseFloat($('comp-gst')?.value)||0;
+  const extras = getAdminExtraCharges();
+  const extraTotal = extras.reduce((a,c)=>a+c.amount,0);
+  const sub = amt + extraTotal;
   const calc=$('comp-calc');
   if(!calc) return;
   if(amt>0){
     calc.style.display='block';
-    const gstAmt=Math.round(amt*gst/100);
-    const total=amt+gstAmt;
-    $('comp-sub').textContent='₹'+amt.toLocaleString('en-IN');
+    const gstAmt=Math.round(sub*gst/100);
+    const total=sub+gstAmt;
+    if ($('comp-base-disp')) $('comp-base-disp').textContent='₹'+amt.toLocaleString('en-IN');
+    const extraDisp=$('comp-extra-disp');
+    if(extraDisp) extraDisp.innerHTML=extras.map(c=>`<div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:.25rem;"><span style="color:var(--mu);">+ ${c.name}:</span><span style="color:var(--acc);">₹${c.amount.toLocaleString('en-IN')}</span></div>`).join('');
+    $('comp-sub').textContent='₹'+sub.toLocaleString('en-IN');
     $('comp-gst-amt').textContent='₹'+gstAmt.toLocaleString('en-IN')+' ('+gst+'%)';
     $('comp-total').textContent='₹'+total.toLocaleString('en-IN');
   } else {
@@ -3199,9 +3484,12 @@ function confirmComplete(bkId){
   const amt=parseFloat($('comp-amt')?.value)||0;
   const gst=parseFloat($('comp-gst')?.value)||0;
   if(!amt){shakeField('comp-amt');return toast('Please enter the total amount.','err');}
-  const gstAmt=Math.round(amt*gst/100);
-  const total=amt+gstAmt;
-  DB.upBk(bkId,{status:'completed',totalAmount:amt,gstPct:gst,gstAmount:gstAmt,grandTotal:total,completedOn:fmtDT(new Date())});
+  const extras = getAdminExtraCharges();
+  const extraTotal = extras.reduce((a,c)=>a+c.amount,0);
+  const sub = amt + extraTotal;
+  const gstAmt=Math.round(sub*gst/100);
+  const total=sub+gstAmt;
+  DB.upBk(bkId,{status:'completed',totalAmount:amt,extraCharges:extras,extraTotal,gstPct:gst,gstAmount:gstAmt,grandTotal:total,completedOn:fmtDT(new Date())});
   const bk=DB.findBk(bkId);
   document.getElementById('completeModal')?.remove();
   document.body.style.overflow='';
@@ -3646,12 +3934,12 @@ function getFilteredBks(){
 }
 function exportFiltered(){
   const bks=getFilteredBks();
-  const headers=['id','svc','sub','uname','uemail','uphone','date','time','addr','lmk','notes','status','created','lastModified'];
+  const headers=['id','svc','sub','uname','uemail','uphone','date','time','addr','lmk','notes','status','assignedTo','assignedEmpId','closedByEmp','closedByEmpId','created','lastModified'];
   downloadCSV(toCSV(bks,headers),'servenow_bookings_'+new Date().toISOString().split('T')[0]+'.csv');
 }
 function exportAll(){
   const bks=DB.bks();
-  const headers=['id','svc','sub','uname','uemail','uphone','date','time','addr','lmk','notes','status','created','lastModified'];
+  const headers=['id','svc','sub','uname','uemail','uphone','date','time','addr','lmk','notes','status','assignedTo','assignedEmpId','closedByEmp','closedByEmpId','grandTotal','gstAmount','created','lastModified'];
   downloadCSV(toCSV(bks,headers),'servenow_all_bookings_'+new Date().toISOString().split('T')[0]+'.csv');
 }
 function exportCustomers(){
