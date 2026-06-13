@@ -222,27 +222,26 @@ function openEmpCloseModal(bkId) {
   const modal = document.createElement('div');
   modal.id = 'empCloseModal';
   modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem;overflow-y:auto;';
-  modal.innerHTML = `<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;animation:upIn .3s ease;">
-    <div style="background:rgba(16,185,129,.1);padding:1.2rem 1.5rem;border-bottom:1px solid var(--bdr);border-radius:20px 20px 0 0;">
-      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--gr);">🏆 Close Booking</h2>
-      <p style="color:var(--mu);font-size:.78rem;margin-top:.2rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:480px;display:flex;flex-direction:column;max-height:92vh;animation:upIn .3s ease;">
+    <div style="background:rgba(16,185,129,.1);padding:1.1rem 1.4rem;border-bottom:1px solid var(--bdr);border-radius:20px 20px 0 0;flex-shrink:0;">
+      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.05rem;color:var(--gr);">🏆 Close Booking</h2>
+      <p style="color:var(--mu);font-size:.76rem;margin-top:.15rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
     </div>
-    <div style="padding:1.4rem;">
-      ${catalogPrice ? `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:.9rem 1.1rem;margin-bottom:1rem;">
-        <p style="font-size:.8rem;color:var(--gr);font-weight:700;margin-bottom:.2rem;">📋 Catalog Price</p>
-        <p style="font-size:1.1rem;font-weight:900;color:var(--gr);">₹${catalogPrice.toLocaleString('en-IN')}</p>
-        <p style="font-size:.72rem;color:var(--mu);margin-top:.2rem;">This is the standard price from catalogue. You can adjust below.</p>
+    <div style="padding:1.2rem;overflow-y:auto;flex:1;">
+      ${catalogPrice ? `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:.75rem 1rem;margin-bottom:.9rem;display:flex;justify-content:space-between;align-items:center;">
+        <div><p style="font-size:.73rem;color:var(--gr);font-weight:700;margin:0;">📋 Catalogue Price</p><p style="font-size:.7rem;color:var(--mu);margin:.1rem 0 0;">Pre-filled. Adjust if needed.</p></div>
+        <span style="font-size:1.1rem;font-weight:900;color:var(--gr);">₹${catalogPrice.toLocaleString('en-IN')}</span>
       </div>` : ''}
       <div class="fg"><label>Base Service Amount (₹) <span style="color:var(--rd);">*</span></label>
         <input type="number" id="eclose-base" placeholder="Enter base amount" min="0" value="${catalogPrice || ''}" oninput="calcEmpCloseTotal()">
       </div>
-      <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;">
-          <p style="font-size:.78rem;font-weight:700;color:var(--acc);">➕ Additional Charges</p>
-          <button onclick="addEmpCharge()" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:var(--acc);padding:.2rem .65rem;border-radius:6px;font-size:.73rem;cursor:pointer;font-family:var(--fb);font-weight:700;">+ Add Charge</button>
+      <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:.85rem;margin-bottom:.9rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;">
+          <p style="font-size:.77rem;font-weight:700;color:var(--acc);margin:0;">➕ Additional Charges</p>
+          <button onclick="addEmpCharge()" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:var(--acc);padding:.2rem .6rem;border-radius:6px;font-size:.72rem;cursor:pointer;font-family:var(--fb);font-weight:700;white-space:nowrap;">+ Add</button>
         </div>
         <div id="emp-extra-charges"></div>
-        <p style="font-size:.7rem;color:var(--mu);margin-top:.4rem;">e.g. Extra parts, travel, materials used</p>
+        <p style="font-size:.68rem;color:var(--mu);margin:.3rem 0 0;">e.g. Extra parts, travel, materials</p>
       </div>
       <div class="fg"><label>GST Rate (%)</label>
         <select id="eclose-gst" onchange="calcEmpCloseTotal()">
@@ -253,17 +252,17 @@ function openEmpCloseModal(bkId) {
           <option value="28">28%</option>
         </select>
       </div>
-      <div id="eclose-calc" style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;display:none;">
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--mu);">Base Amount:</span><span id="eclose-base-disp">—</span></div>
+      <div id="eclose-calc" style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.9rem;margin-bottom:.9rem;display:none;">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem;"><span style="color:var(--mu);">Base Amount:</span><span id="eclose-base-disp">—</span></div>
         <div id="eclose-extra-disp"></div>
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--mu);">Sub-total:</span><span id="eclose-sub">—</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--yl);">GST:</span><span id="eclose-gst-amt" style="color:var(--yl);">—</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--gr);">GRAND TOTAL:</span><span id="eclose-grand" style="color:var(--gr);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem;border-top:1px solid var(--bdr);padding-top:.3rem;"><span style="color:var(--mu);">Sub-total:</span><span id="eclose-sub">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem;"><span style="color:var(--yl);">GST:</span><span id="eclose-gst-amt" style="color:var(--yl);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.92rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.3rem;"><span style="color:var(--gr);">GRAND TOTAL:</span><span id="eclose-grand" style="color:var(--gr);">—</span></div>
       </div>
-      <div style="display:flex;gap:.7rem;">
-        <button onclick="document.getElementById('empCloseModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
-        <button onclick="confirmEmpClose('${bkId}')" style="flex:2;background:var(--gr);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">✅ Confirm &amp; Close Booking</button>
-      </div>
+    </div>
+    <div style="padding:1rem 1.2rem;border-top:1px solid var(--bdr);display:flex;gap:.7rem;flex-shrink:0;border-radius:0 0 20px 20px;background:var(--s1);">
+      <button onclick="document.getElementById('empCloseModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.7rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;font-size:.85rem;">Cancel</button>
+      <button onclick="confirmEmpClose('${bkId}')" style="flex:2;background:var(--gr);color:#fff;border:none;padding:.7rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.85rem;">✅ Confirm &amp; Close</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -280,9 +279,9 @@ function addEmpCharge() {
   const row = document.createElement('div');
   row.id = 'emp-chg-' + i;
   row.style.cssText = 'display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center;';
-  row.innerHTML = `<input type="text" placeholder="Charge name (e.g. Gas refill)" id="emp-chg-nm-${i}" style="flex:2;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcEmpCloseTotal()">
-    <input type="number" placeholder="₹" id="emp-chg-amt-${i}" min="0" style="flex:1;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcEmpCloseTotal()">
-    <button onclick="document.getElementById('emp-chg-${i}').remove();calcEmpCloseTotal();" style="background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.9rem;flex-shrink:0;">✕</button>`;
+  row.innerHTML = `<input type="text" placeholder="e.g. Gas refill, Parts" id="emp-chg-nm-${i}" style="flex:2;min-width:0;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.42rem .65rem;color:var(--tx);font-family:var(--fb);font-size:.78rem;outline:none;box-sizing:border-box;" oninput="calcEmpCloseTotal()">
+    <input type="number" placeholder="₹" id="emp-chg-amt-${i}" min="0" style="flex:1;min-width:60px;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.42rem .65rem;color:var(--tx);font-family:var(--fb);font-size:.78rem;outline:none;box-sizing:border-box;" oninput="calcEmpCloseTotal()">
+    <button onclick="document.getElementById('emp-chg-${i}').remove();calcEmpCloseTotal();" style="background:var(--rdd,rgba(239,68,68,.12));border:1px solid rgba(239,68,68,.3);color:var(--rd);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.85rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;">✕</button>`;
   cont.appendChild(row);
 }
 
@@ -339,10 +338,12 @@ function confirmEmpClose(bkId) {
   document.getElementById('empCloseModal')?.remove();
   document.body.style.overflow = '';
   if (bk) sendNotification({ type: 'update', to: bk.uemail, phone: bk.uphone, name: bk.uname, bkId: bk.id, svc: bk.svc, sub: bk.sub, date: bk.date, time: bk.time, addr: bk.addr, status: 'completed' });
-  toast('✅ Booking closed! Invoice ready.');
+  toast('✅ Booking closed!');
   renderEmpOverview();
   renderEmpTasks('all');
   if ($('emp-done-list')) renderEmpCompleted();
+  setTimeout(() => showSendInvoicePrompt(bkId), 400);
+  setTimeout(() => showSendInvoicePrompt(bkId), 400);
 }
 
 function empChangePwd() {
@@ -442,10 +443,59 @@ function delEmployee(id) {
 }
 
 function adminResetEmpPwd(id, name) {
-  const newPwd = Math.random().toString(36).slice(-8);
-  EMP_DB.up(id, { pass: newPwd });
-  alert(`Password for ${name} reset to:\n\n${newPwd}\n\nShare securely.`);
-  toast('✅ Password reset for ' + name);
+  const emp = EMP_DB.find(id); if (!emp) return;
+  const old = document.getElementById('resetPwdModal'); if (old) old.remove();
+  document.body.style.overflow = 'hidden';
+  const modal = document.createElement('div');
+  modal.id = 'resetPwdModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid var(--bdr);border-radius:20px;width:100%;max-width:420px;padding:1.6rem;animation:upIn .3s ease;">
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:.25rem;">🔑 Reset Password</h2>
+    <p style="color:var(--mu);font-size:.82rem;margin-bottom:1.2rem;">Changing password for <strong>${name}</strong></p>
+    <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:.85rem 1rem;margin-bottom:1rem;">
+      <div style="font-size:.72rem;color:var(--mu);margin-bottom:.35rem;font-weight:600;">CURRENT PASSWORD</div>
+      <div style="display:flex;align-items:center;gap:.6rem;">
+        <span id="rpwd-current" style="font-family:monospace;font-size:.92rem;color:var(--tx);letter-spacing:.08em;flex:1;">${'•'.repeat(emp.pass.length)}</span>
+        <button id="rpwd-show-btn" onclick="
+          const s=document.getElementById('rpwd-current');
+          const hidden=s.textContent.includes('•');
+          s.textContent=hidden?'${emp.pass.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}':'${'•'.repeat(emp.pass.length)}';
+          this.textContent=hidden?'🙈 Hide':'👁 Show';
+        " style="background:var(--s3);border:1px solid var(--bdr);color:var(--mu);cursor:pointer;font-size:.78rem;padding:.25rem .6rem;border-radius:6px;white-space:nowrap;font-family:var(--fb);">👁 Show</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>New Password <span style="color:var(--rd);">*</span></label>
+      <div style="position:relative;">
+        <input type="password" id="rpwd-new" placeholder="Min 6 characters" style="padding-right:3rem;">
+        <button type="button" onclick="const i=document.getElementById('rpwd-new');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈';" style="position:absolute;right:.6rem;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;font-size:.95rem;color:var(--mu);padding:0;">👁</button>
+      </div>
+    </div>
+    <div class="fg">
+      <label>Confirm New Password <span style="color:var(--rd);">*</span></label>
+      <div style="position:relative;">
+        <input type="password" id="rpwd-confirm" placeholder="Re-enter new password" style="padding-right:3rem;">
+        <button type="button" onclick="const i=document.getElementById('rpwd-confirm');i.type=i.type==='password'?'text':'password';this.textContent=i.type==='password'?'👁':'🙈';" style="position:absolute;right:.6rem;top:50%;transform:translateY(-50%);background:transparent;border:none;cursor:pointer;font-size:.95rem;color:var(--mu);padding:0;">👁</button>
+      </div>
+    </div>
+    <div style="display:flex;gap:.7rem;margin-top:.7rem;">
+      <button onclick="document.getElementById('resetPwdModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
+      <button onclick="submitResetPwd('${id}','${name}')" style="flex:2;background:var(--bl);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">🔑 Save New Password</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  attachFieldClearers();
+}
+
+function submitResetPwd(id, name) {
+  const np = v('rpwd-new'), nc = v('rpwd-confirm');
+  if (!np || np.length < 6) { shakeField('rpwd-new'); return toast('Password must be at least 6 characters.', 'err'); }
+  if (np !== nc) { shakeField('rpwd-confirm'); return toast('Passwords do not match.', 'err'); }
+  EMP_DB.up(id, { pass: np });
+  document.getElementById('resetPwdModal')?.remove();
+  document.body.style.overflow = '';
+  toast('✅ Password updated for ' + name);
+  renderEmployees();
 }
 
 function openAddEmployeeModal() {
@@ -3299,47 +3349,91 @@ function showBookingConfirmPopup(bk){
 
 // ── INVOICE GENERATION ──
 function buildInvoiceHTML(bk,amount,gst){
-  const gstAmt=amount&&gst?Math.round(amount*gst/100):0;
-  const total=amount?(amount+gstAmt):null;
+  // Use stored billing data from booking if available
+  const baseAmt = amount || bk.totalAmount || 0;
+  const gstPct = gst !== undefined ? gst : (bk.gstPct || 0);
+  const extras = bk.extraCharges || [];
+  const extraTotal = bk.extraTotal || extras.reduce((a,c)=>a+c.amount,0);
+  const sub = baseAmt + extraTotal;
+  const gstAmt = sub && gstPct ? Math.round(sub * gstPct / 100) : 0;
+  const grandTotal = bk.grandTotal || (sub + gstAmt);
+  const technician = bk.closedByEmp || bk.assignedTo || '';
+  const orderDate = bk.created ? bk.created.split(' ')[0] || bk.created : bk.date;
+  // Dynamic QR: full invoice verification data
+  const qrPayload = encodeURIComponent('ServeNow Invoice\nID: ' + bk.id + '\nCustomer: ' + bk.uname + '\nService: ' + bk.svc + ' - ' + bk.sub + '\nDate: ' + bk.date + '\nTechnician: ' + (technician||'N/A') + '\nTotal: Rs.' + (grandTotal||'0') + '\nVerify: support@servenow.in');
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=120x120&color=111111&bgcolor=ffffff&data=' + qrPayload;
   return`<!DOCTYPE html><html><head><meta charset="UTF-8">
-<style>body{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;max-width:700px;margin:0 auto;padding:2rem;}
+<style>
+body{font-family:'Segoe UI',sans-serif;background:#fff;color:#111;max-width:720px;margin:0 auto;padding:2rem;}
 .inv-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #f97316;padding-bottom:1rem;margin-bottom:1.5rem;}
 .inv-logo{font-size:1.6rem;font-weight:900;color:#111;}.inv-logo b{color:#f97316;}
 .inv-tag{font-size:.7rem;color:#f97316;font-weight:700;letter-spacing:.1em;}
-.inv-id{font-size:.85rem;color:#555;}
 .inv-table{width:100%;border-collapse:collapse;margin:1.2rem 0;}
 .inv-table th{background:#f97316;color:#fff;padding:.6rem .9rem;text-align:left;font-size:.82rem;}
-.inv-table td{border-bottom:1px solid #eee;padding:.6rem .9rem;font-size:.85rem;}
+.inv-table td{border-bottom:1px solid #eee;padding:.6rem .9rem;font-size:.85rem;vertical-align:top;}
 .inv-table tr:last-child td{border-bottom:none;}
-.inv-total{background:#fff8f3;border:2px solid #f97316;border-radius:8px;padding:1rem 1.2rem;text-align:right;margin-top:1rem;}
+.inv-total{background:#fff8f3;border:2px solid #f97316;border-radius:8px;padding:1rem 1.4rem;text-align:right;margin-top:1rem;}
+.inv-total .row{display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.35rem;font-size:.88rem;}
+.inv-total .grand{font-size:1.05rem;font-weight:700;border-top:2px solid #f97316;padding-top:.5rem;color:#f97316;}
 .inv-foot{margin-top:2rem;font-size:.72rem;color:#888;border-top:1px solid #eee;padding-top:.8rem;text-align:center;}
-.badge{background:#fef3c7;color:#d97706;padding:.15rem .5rem;border-radius:4px;font-size:.74rem;font-weight:700;}
+.addr-box{background:#f9f9f9;padding:1rem;border-radius:8px;}
+.extra-row td{color:#555;font-size:.82rem;padding:.4rem .9rem;}
+@media print{body{padding:0;}button{display:none;}}
 </style></head><body>
 <div class="inv-head">
-  <div><div class="inv-logo">Serve<b>Now</b></div><div class="inv-tag">ARIYALUR &amp; PERAMBALUR</div><div style="font-size:.75rem;color:#888;margin-top:.3rem;">support@servenow.in | +91 94XXX XXXXX</div></div>
-  <div style="text-align:right;"><div style="font-size:1.1rem;font-weight:700;color:#f97316;">TAX INVOICE</div><div class="inv-id">Booking ID: <strong>${bk.id}</strong></div><div style="font-size:.78rem;color:#888;">Date: ${bk.date}</div><div style="font-size:.78rem;color:#888;">Generated: ${fmtDT(new Date())}</div></div>
+  <div>
+    <div class="inv-logo">Serve<b>Now</b></div>
+    <div class="inv-tag">ARIYALUR &amp; PERAMBALUR</div>
+    <div style="font-size:.75rem;color:#888;margin-top:.3rem;">support@servenow.in | +91 94XXX XXXXX</div>
+  </div>
+  <div style="text-align:right;">
+    <div style="font-size:1.1rem;font-weight:700;color:#f97316;">TAX INVOICE</div>
+    <div style="font-size:.85rem;color:#555;">Booking ID: <strong>${bk.id}</strong></div>
+    <div style="font-size:.78rem;color:#888;">Order Date: ${orderDate}</div>
+    <div style="font-size:.78rem;color:#888;">Generated: ${fmtDT(new Date())}</div>
+  </div>
 </div>
 <div style="display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1.5rem;">
-  <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Bill To</div><div>${bk.uname}</div><div style="color:#555;font-size:.83rem;">${bk.uphone}</div><div style="color:#555;font-size:.83rem;">${bk.uemail||''}</div></div>
-  <div style="background:#f9f9f9;padding:1rem;border-radius:8px;"><div style="font-weight:700;margin-bottom:.4rem;">Service Address</div><div style="font-size:.83rem;color:#555;">${bk.addr}</div>${bk.lmk?`<div style="font-size:.8rem;color:#888;">Landmark: ${bk.lmk}</div>`:''}</div>
+  <div class="addr-box">
+    <div style="font-weight:700;margin-bottom:.4rem;">Bill To</div>
+    <div>${bk.uname}</div>
+    <div style="color:#555;font-size:.83rem;">${bk.uphone}</div>
+    <div style="color:#555;font-size:.83rem;">${bk.uemail||''}</div>
+  </div>
+  <div class="addr-box">
+    <div style="font-weight:700;margin-bottom:.4rem;">Service Address</div>
+    <div style="font-size:.83rem;color:#555;">${bk.addr}</div>
+    ${bk.lmk?`<div style="font-size:.8rem;color:#888;">Landmark: ${bk.lmk}</div>`:''}
+    ${technician?`<div style="font-size:.8rem;color:#555;margin-top:.3rem;">Technician: <strong>${technician}</strong></div>`:''}
+  </div>
 </div>
 <table class="inv-table">
-  <thead><tr><th>Service</th><th>Sub-Service</th><th>Date &amp; Time</th><th>Base Amount</th></tr></thead>
-  <tbody><tr>
-    <td>${bk.svc}</td>
-    <td>${bk.sub}</td>
-    <td>${bk.date} at ${bk.time}</td>
-    <td>${amount?'₹'+amount.toLocaleString('en-IN'):'—'}</td>
-  </tr></tbody>
+  <thead><tr><th>Service</th><th>Sub-Service</th><th>Service Date &amp; Time</th><th style="text-align:right;">Amount (₹)</th></tr></thead>
+  <tbody>
+    <tr>
+      <td>${bk.svc}</td>
+      <td>${bk.sub}</td>
+      <td>${bk.date} at ${bk.time}</td>
+      <td style="text-align:right;">${baseAmt?'₹'+baseAmt.toLocaleString('en-IN'):'—'}</td>
+    </tr>
+    ${extras.length ? extras.map(c=>`<tr class="extra-row"><td colspan="2" style="padding-left:1.4rem;color:#555;font-size:.81rem;">+ ${c.name}</td><td></td><td style="text-align:right;font-size:.81rem;color:#555;">₹${c.amount.toLocaleString('en-IN')}</td></tr>`).join('') : ''}
+  </tbody>
 </table>
-${amount?`<div class="inv-total">
-  <div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;"><span>Sub-total:</span><span>₹${amount.toLocaleString('en-IN')}</span></div>
-  ${gst?`<div style="display:flex;justify-content:flex-end;gap:2rem;margin-bottom:.4rem;font-size:.88rem;color:#d97706;"><span>GST (${gst}%):</span><span>₹${gstAmt.toLocaleString('en-IN')}</span></div>`:''}
-  <div style="display:flex;justify-content:flex-end;gap:2rem;font-size:1rem;font-weight:700;border-top:1px solid #f97316;padding-top:.4rem;color:#f97316;"><span>TOTAL:</span><span>₹${total.toLocaleString('en-IN')}</span></div>
+${(baseAmt||sub)?`<div class="inv-total">
+  <div class="row"><span>Base Amount:</span><span>₹${baseAmt.toLocaleString('en-IN')}</span></div>
+  ${extras.map(c=>`<div class="row" style="color:#555;font-size:.82rem;"><span>+ ${c.name}:</span><span>₹${c.amount.toLocaleString('en-IN')}</span></div>`).join('')}
+  ${extraTotal>0?`<div class="row" style="border-top:1px solid #eee;padding-top:.3rem;"><span>Sub-total:</span><span>₹${sub.toLocaleString('en-IN')}</span></div>`:''}
+  ${gstPct?`<div class="row" style="color:#d97706;"><span>GST (${gstPct}%):</span><span>₹${gstAmt.toLocaleString('en-IN')}</span></div>`:''}
+  <div class="row grand"><span>GRAND TOTAL:</span><span>₹${grandTotal.toLocaleString('en-IN')}</span></div>
 </div>`:'<div style="background:#fff8f3;border:1px solid #f97316;border-radius:8px;padding:1rem;text-align:center;color:#d97706;font-size:.85rem;">Amount will be confirmed after service completion.</div>'}
-<div style="margin-top:1rem;"><span class="badge">Status: ${bk.status}</span></div>
 ${bk.notes?`<div style="margin-top:.8rem;font-size:.82rem;color:#555;"><strong>Notes:</strong> ${bk.notes}</div>`:''}
-<div class="inv-foot">ServeNow | Ariyalur, Tamil Nadu 621704 | Perambalur, Tamil Nadu 621212<br>Thank you for choosing ServeNow! 🙏</div>
+<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:1.5rem;">
+  <div class="inv-foot" style="border:none;padding:0;text-align:left;">ServeNow | Ariyalur, TN 621704 | Perambalur, TN 621212<br>Thank you for choosing ServeNow! 🙏<br>For support: support@servenow.in</div>
+  <div style="text-align:center;">
+    <img src="${qrUrl}" width="90" height="90" alt="QR" style="border:1px solid #eee;border-radius:6px;display:block;">
+    <div style="font-size:.62rem;color:#aaa;margin-top:.2rem;">Scan to verify</div>
+  </div>
+</div>
 </body></html>`;
 }
 function downloadInvoice(bkId){
@@ -3388,25 +3482,25 @@ function showCompleteModal(bkId){
   document.body.style.overflow='hidden';
   const modal=document.createElement('div');
   modal.id='completeModal';
-  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
-  modal.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:480px;max-height:90vh;overflow-y:auto;padding:0;overflow:hidden;">
-    <div style="background:rgba(16,185,129,.1);padding:1.3rem 1.5rem;border-bottom:1px solid var(--bdr);">
-      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--gr);">🏆 Complete &amp; Close Booking</h2>
-      <p style="color:var(--mu);font-size:.78rem;margin-top:.2rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1rem;';
+  modal.innerHTML=`<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:480px;display:flex;flex-direction:column;max-height:92vh;animation:upIn .3s ease;">
+    <div style="background:rgba(16,185,129,.1);padding:1.1rem 1.4rem;border-bottom:1px solid var(--bdr);border-radius:20px 20px 0 0;flex-shrink:0;">
+      <h2 style="font-family:var(--fh);font-weight:900;font-size:1.05rem;color:var(--gr);">🏆 Complete &amp; Close Booking</h2>
+      <p style="color:var(--mu);font-size:.76rem;margin-top:.15rem;">${bk.svc} — ${bk.sub} | ${bk.uname}</p>
     </div>
-    <div style="padding:1.5rem;">
-      ${catalogPrice ? `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:.9rem 1.1rem;margin-bottom:1rem;">
-        <p style="font-size:.8rem;color:var(--gr);font-weight:700;">📋 Catalog Price: <span style="font-size:1.05rem;">₹${catalogPrice.toLocaleString('en-IN')}</span></p>
-        <p style="font-size:.7rem;color:var(--mu);margin-top:.2rem;">Pre-filled from catalogue. Adjust if needed.</p>
+    <div style="padding:1.2rem;overflow-y:auto;flex:1;">
+      ${catalogPrice ? `<div style="background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);border-radius:10px;padding:.75rem 1rem;margin-bottom:.9rem;display:flex;justify-content:space-between;align-items:center;">
+        <div><p style="font-size:.73rem;color:var(--gr);font-weight:700;margin:0;">📋 Catalogue Price</p><p style="font-size:.7rem;color:var(--mu);margin:.1rem 0 0;">Pre-filled. Adjust if needed.</p></div>
+        <span style="font-size:1.1rem;font-weight:900;color:var(--gr);">₹${catalogPrice.toLocaleString('en-IN')}</span>
       </div>` : ''}
       <div class="fg"><label>Base Service Amount (₹) <span style="color:var(--rd);">*</span></label><input type="number" id="comp-amt" placeholder="e.g. 1500" min="0" value="${catalogPrice || ''}" oninput="calcCompGST()"></div>
-      <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.7rem;">
-          <p style="font-size:.78rem;font-weight:700;color:var(--acc);">➕ Additional Charges</p>
-          <button onclick="addAdminCharge()" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:var(--acc);padding:.2rem .65rem;border-radius:6px;font-size:.73rem;cursor:pointer;font-family:var(--fb);font-weight:700;">+ Add Charge</button>
+      <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:.85rem;margin-bottom:.9rem;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem;">
+          <p style="font-size:.77rem;font-weight:700;color:var(--acc);margin:0;">➕ Additional Charges</p>
+          <button onclick="addAdminCharge()" style="background:rgba(249,115,22,.15);border:1px solid rgba(249,115,22,.3);color:var(--acc);padding:.2rem .6rem;border-radius:6px;font-size:.72rem;cursor:pointer;font-family:var(--fb);font-weight:700;white-space:nowrap;">+ Add</button>
         </div>
         <div id="admin-extra-charges"></div>
-        <p style="font-size:.7rem;color:var(--mu);margin-top:.4rem;">e.g. Parts, materials, travel</p>
+        <p style="font-size:.68rem;color:var(--mu);margin:.3rem 0 0;">e.g. Parts, materials, travel charges</p>
       </div>
       <div class="fg"><label>GST Rate (%)</label>
         <select id="comp-gst" onchange="calcCompGST()">
@@ -3417,17 +3511,17 @@ function showCompleteModal(bkId){
           <option value="28">28%</option>
         </select>
       </div>
-      <div id="comp-calc" style="background:var(--s2);border:1px solid var(--bdr);border-radius:10px;padding:1rem;margin-bottom:1rem;display:none;">
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--mu);">Base Amount:</span><span id="comp-base-disp">—</span></div>
+      <div id="comp-calc" style="background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.9rem;margin-bottom:.5rem;display:none;">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem;"><span style="color:var(--mu);">Base Amount:</span><span id="comp-base-disp">—</span></div>
         <div id="comp-extra-disp"></div>
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--mu);">Sub-total:</span><span id="comp-sub">—</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.83rem;margin-bottom:.35rem;"><span style="color:var(--yl);">GST Amount:</span><span id="comp-gst-amt" style="color:var(--yl);">—</span></div>
-        <div style="display:flex;justify-content:space-between;font-size:.95rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.35rem;"><span style="color:var(--gr);">GRAND TOTAL:</span><span id="comp-total" style="color:var(--gr);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem;border-top:1px solid var(--bdr);padding-top:.3rem;"><span style="color:var(--mu);">Sub-total:</span><span id="comp-sub">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:.3rem;"><span style="color:var(--yl);">GST Amount:</span><span id="comp-gst-amt" style="color:var(--yl);">—</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:.92rem;font-weight:700;border-top:1px solid var(--bdr);padding-top:.3rem;"><span style="color:var(--gr);">GRAND TOTAL:</span><span id="comp-total" style="color:var(--gr);">—</span></div>
       </div>
-      <div style="display:flex;gap:.7rem;">
-        <button onclick="document.getElementById('completeModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;">Cancel</button>
-        <button onclick="confirmComplete('${bkId}')" style="flex:2;background:var(--gr);color:#fff;border:none;padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;">Complete &amp; Send Invoice</button>
-      </div>
+    </div>
+    <div style="padding:1rem 1.2rem;border-top:1px solid var(--bdr);display:flex;gap:.7rem;flex-shrink:0;border-radius:0 0 20px 20px;background:var(--s1);">
+      <button onclick="document.getElementById('completeModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.7rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;font-size:.85rem;">Cancel</button>
+      <button onclick="confirmComplete('${bkId}')" style="flex:2;background:var(--gr);color:#fff;border:none;padding:.7rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.85rem;">✅ Complete &amp; Close</button>
     </div>
   </div>`;
   document.body.appendChild(modal);
@@ -3442,9 +3536,9 @@ function addAdminCharge() {
   const row = document.createElement('div');
   row.id = 'admin-chg-' + i;
   row.style.cssText = 'display:flex;gap:.5rem;margin-bottom:.5rem;align-items:center;';
-  row.innerHTML = `<input type="text" placeholder="Charge name" id="admin-chg-nm-${i}" style="flex:2;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcCompGST()">
-    <input type="number" placeholder="₹" id="admin-chg-amt-${i}" min="0" style="flex:1;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;" oninput="calcCompGST()">
-    <button onclick="document.getElementById('admin-chg-${i}').remove();calcCompGST();" style="background:var(--rdd);border:1px solid rgba(239,68,68,.3);color:var(--rd);width:28px;height:28px;border-radius:6px;cursor:pointer;font-size:.9rem;flex-shrink:0;">✕</button>`;
+  row.innerHTML = `<input type="text" placeholder="Charge name (e.g. Parts)" id="admin-chg-nm-${i}" style="flex:2;min-width:0;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;box-sizing:border-box;" oninput="calcCompGST()">
+    <input type="number" placeholder="₹" id="admin-chg-amt-${i}" min="0" style="flex:1;min-width:60px;background:var(--s3);border:1px solid var(--bdr);border-radius:8px;padding:.45rem .7rem;color:var(--tx);font-family:var(--fb);font-size:.8rem;outline:none;box-sizing:border-box;" oninput="calcCompGST()">
+    <button onclick="document.getElementById('admin-chg-${i}').remove();calcCompGST();" style="background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:var(--rd);width:30px;height:30px;border-radius:6px;cursor:pointer;font-size:.85rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;">✕</button>`;
   cont.appendChild(row);
 }
 
@@ -3497,8 +3591,30 @@ function confirmComplete(bkId){
   sendNotification({type:'update',to:bk.uemail,phone:bk.uphone,name:bk.uname,bkId:bk.id,svc:bk.svc,sub:bk.sub,date:bk.date,time:bk.time,addr:bk.addr,status:'completed'});
   renderAdminDash();renderAdminBks();buildAdminNav();
   SVCS.forEach(s=>{if($('list-svc-'+s.id)&&$('ap-svc-'+s.id)?.classList.contains('on'))renderSvcPanel(s.id,s.name);});
-  toast('🏆 Booking completed! Invoice ready.');
-  setTimeout(()=>{if(confirm('Download invoice for this booking?'))downloadInvoice(bkId);},500);
+  toast('🏆 Booking completed!');
+  setTimeout(()=>showSendInvoicePrompt(bkId),400);
+}
+
+function showSendInvoicePrompt(bkId) {
+  const bk = DB.findBk(bkId); if (!bk) return;
+  const old = document.getElementById('sendInvModal'); if (old) old.remove();
+  document.body.style.overflow = 'hidden';
+  const modal = document.createElement('div');
+  modal.id = 'sendInvModal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9500;display:flex;align-items:center;justify-content:center;padding:1.5rem;';
+  modal.innerHTML = `<div style="background:var(--s1);border:1px solid rgba(16,185,129,.3);border-radius:20px;width:100%;max-width:420px;padding:1.6rem;text-align:center;">
+    <div style="font-size:2.5rem;margin-bottom:.6rem;">📄</div>
+    <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;margin-bottom:.4rem;">Send Invoice to Customer?</h2>
+    <p style="color:var(--mu);font-size:.82rem;margin-bottom:.3rem;">${bk.uname} — ${bk.svc}</p>
+    <p style="color:var(--mu);font-size:.78rem;margin-bottom:1.4rem;">Grand Total: <strong style="color:var(--gr);">₹${(bk.grandTotal||0).toLocaleString('en-IN')}</strong></p>
+    <div style="display:flex;flex-direction:column;gap:.65rem;">
+      <button onclick="downloadInvoice('${bkId}');document.getElementById('sendInvModal').remove();document.body.style.overflow='';" style="width:100%;background:var(--acc);color:#fff;border:none;padding:.8rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.9rem;">⬇ Download Invoice</button>
+      <button onclick="sendInvoiceWA('${bkId}');document.getElementById('sendInvModal').remove();document.body.style.overflow='';" style="width:100%;background:#25d366;color:#fff;border:none;padding:.8rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.9rem;">💬 Send via WhatsApp</button>
+      <button onclick="document.getElementById('sendInvModal').remove();document.body.style.overflow='';" style="width:100%;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.75rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;font-size:.88rem;">Skip for Now</button>
+    </div>
+  </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); document.body.style.overflow = ''; } });
 }
 
 // ── ADMIN REVIEWS WITH FILTER ──
