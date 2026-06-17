@@ -1365,6 +1365,12 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .b-inprogress{background:rgba(249,115,22,.12);color:var(--acc);}
 .b-completed{background:var(--grd);color:var(--gr);}
 .b-cancelled{background:var(--rdd);color:var(--rd);}
+.b-reopened{background:rgba(139,92,246,.12);color:var(--pu);}
+/* Reopen history strip */
+.reopen-strip{background:rgba(139,92,246,.08);border:1px solid rgba(139,92,246,.22);border-radius:8px;padding:.5rem .75rem;margin-top:.35rem;font-size:.72rem;color:var(--pu);}
+.reopen-strip strong{font-weight:700;}
+.reopen-log-entry{padding:.45rem 0;border-bottom:1px solid rgba(139,92,246,.15);display:flex;gap:.55rem;align-items:flex-start;}
+.reopen-log-entry:last-child{border-bottom:none;}
 .act-row{display:flex;gap:.28rem;margin-top:.42rem;flex-wrap:wrap;}
 .abt{background:none;border:1px solid var(--bdr2);color:var(--mu);padding:.2rem .55rem;border-radius:5px;font-size:.7rem;cursor:pointer;transition:.2s;font-family:var(--fb);}
 .abt:hover{border-color:var(--acc);color:var(--acc);}
@@ -3495,6 +3501,12 @@ function clearAdminFilters(){
 }
 
 function adminRow(b){
+  // Build reopen history strip (shown when booking was previously reopened)
+  const reopenLog=b.reopenLog||[];
+  const reopenStripHtml=reopenLog.length?`<div class="reopen-strip">
+    <strong>🔄 Reopened ${reopenLog.length}x</strong> &nbsp;|&nbsp; Last on: ${reopenLog[reopenLog.length-1].on}
+    &nbsp;<button onclick="showReopenHistory('${b.id}')" style="background:none;border:none;color:var(--pu);font-size:.7rem;cursor:pointer;text-decoration:underline;font-family:var(--fb);padding:0;">View log →</button>
+  </div>`:'';
   return`<div class="br">
     <div><div class="br-svc">${b.svc}</div><div class="br-sub">${b.sub}</div>
     <div class="br-meta">👤 ${b.uname} &nbsp;|&nbsp; 📞 ${b.uphone} &nbsp;|&nbsp; 📧 ${b.uemail}</div>
@@ -3504,6 +3516,7 @@ function adminRow(b){
     ${b.assignedTo?`<div class="br-meta" style="color:var(--bl);font-weight:600;">👷 Currently with: ${b.assignedTo}${b.assignedEmpId?' ('+b.assignedEmpId+')':''}</div>`:'<div class="br-meta" style="color:var(--mu);">👷 Not yet assigned</div>'}
     ${b.closedByEmp?`<div class="br-meta" style="color:var(--gr);font-weight:600;">🏆 Closed by: ${b.closedByEmp}${b.closedByEmpId?' ('+b.closedByEmpId+')':''}</div>`:''}
     <div class="br-id">${b.id} • Created: ${b.created}${b.lastModified?' • Modified: '+b.lastModified:''}</div>
+    ${reopenStripHtml}
     <div class="act-row">
       ${b.status==='pending'?
         '<button class="abt" style="background:rgba(16,185,129,.15);border-color:rgba(16,185,129,.5);color:#10b981;font-weight:700;padding:.3rem 1rem;font-size:.78rem;" onclick="aUpd(\''+b.id+'\',\'confirmed\')">✅ Accept &amp; Confirm</button>':
@@ -3513,12 +3526,13 @@ function adminRow(b){
         '<button class="abt" style="background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#3b82f6;font-weight:700;padding:.3rem 1rem;font-size:.78rem;" onclick="showCompleteModal(\''+b.id+'\')">🏆 Mark Complete</button>':''
       }
       ${!['completed','cancelled'].includes(b.status)?'<button class="abt" style="color:var(--rd);border-color:rgba(239,68,68,.35);padding:.3rem .8rem;font-size:.78rem;" onclick="aUpd(\''+b.id+'\',\'cancelled\')">❌ Cancel</button>':''}
+      ${['completed','cancelled'].includes(b.status)?'<button class="abt" style="background:rgba(139,92,246,.12);border-color:rgba(139,92,246,.4);color:var(--pu);font-weight:700;padding:.3rem 1rem;font-size:.78rem;" onclick="aReopen(\''+b.id+'\')">🔄 Reopen</button>':''}
       <button class="abt wa" style="padding:.3rem .9rem;font-size:.78rem;" onclick="sendWhatsAppNotif('${b.id}')">💬 Send WhatsApp</button>
       <button class="abt" style="padding:.3rem .8rem;font-size:.78rem;color:var(--bl);border-color:rgba(59,130,246,.35);" onclick="getDirections('${b.addr.replace(/'/g,"\\'")}','${b.lmk?b.lmk.replace(/'/g,"\\'"):''}')">🗺️ Get Directions</button>
       ${b.status==='completed'?'<button class="abt" style="padding:.3rem .8rem;font-size:.78rem;color:var(--gr);border-color:rgba(16,185,129,.35);" onclick="downloadInvoice(\''+b.id+'\')">⬇ Invoice</button>':''}
       <button class="abt" style="padding:.3rem .8rem;font-size:.78rem;color:var(--rd);border-color:rgba(239,68,68,.35);font-weight:700;" onclick="aDel('${b.id}')">🗑️ Delete</button>
     </div></div>
-    <span class="badge b-${b.status}">${b.status==='inprogress'?'In Progress':b.status}</span>
+    <span class="badge b-${b.status}">${b.status==='inprogress'?'In Progress':b.status.charAt(0).toUpperCase()+b.status.slice(1)}</span>
   </div>`;
 }
 // ── BOOKING CONFIRMATION POPUP ──
@@ -4161,6 +4175,180 @@ function confirmReservation(){
 function aDel(id){
   if(!confirm('Delete this booking permanently?'))return;
   DB.delBk(id);renderAdminBks();renderAdminDash();buildAdminNav();updateStats();toast('Booking deleted.');
+}
+
+// ══════════════════════════════════════
+// REOPEN BOOKING — investigation & history tracking
+// ══════════════════════════════════════
+function aReopen(bkId){
+  const b=DB.findBk(bkId);if(!b)return;
+  const old=document.getElementById('reopenModal');if(old)old.remove();
+  document.body.style.overflow='hidden';
+  const modal=document.createElement('div');
+  modal.id='reopenModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+  const log=b.reopenLog||[];
+  const prevHistoryHtml=log.length?`
+    <div style="background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:.9rem 1rem;margin-bottom:1rem;">
+      <div style="font-size:.71rem;font-weight:700;color:var(--pu);letter-spacing:.07em;text-transform:uppercase;margin-bottom:.55rem;">📋 Previous Reopen History (${log.length})</div>
+      ${log.map((r,i)=>`<div class="reopen-log-entry">
+        <div style="background:rgba(139,92,246,.2);color:var(--pu);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.63rem;font-weight:800;flex-shrink:0;">${i+1}</div>
+        <div style="flex:1;">
+          <div style="font-size:.77rem;font-weight:700;">Was <span class="badge b-${r.fromStatus}" style="font-size:.65rem;">${r.fromStatus}</span> → Reopened to <span class="badge b-${r.toStatus}" style="font-size:.65rem;">${r.toStatus}</span></div>
+          <div style="color:rgba(240,240,248,.6);font-size:.75rem;margin-top:.18rem;font-style:italic;">"${r.reason}"</div>
+          <div style="color:var(--mu2);font-size:.67rem;margin-top:.1rem;">🕒 ${r.on}</div>
+        </div>
+      </div>`).join('')}
+    </div>`:'';
+  modal.innerHTML=`
+    <div style="background:var(--s1);border:1px solid rgba(139,92,246,.35);border-radius:20px;width:100%;max-width:500px;max-height:calc(100vh - 3rem);overflow-y:auto;overscroll-behavior:contain;animation:upIn .3s ease;">
+      <!-- Header -->
+      <div style="position:sticky;top:0;background:var(--s1);border-bottom:1px solid var(--bdr);padding:1.2rem 1.5rem;display:flex;align-items:center;gap:1rem;z-index:1;border-radius:20px 20px 0 0;background:rgba(139,92,246,.08);">
+        <div style="font-size:2rem;flex-shrink:0;">🔄</div>
+        <div style="flex:1;">
+          <h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--pu);">Reopen Booking</h2>
+          <p style="color:var(--mu);font-size:.77rem;margin-top:.1rem;">Reactivate for investigation &amp; keep full history</p>
+        </div>
+        <button onclick="document.getElementById('reopenModal').remove();document.body.style.overflow='';" style="background:var(--s2);border:1px solid var(--bdr);color:var(--mu);width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <!-- Body -->
+      <div style="padding:1.4rem;">
+        <!-- Booking Summary -->
+        <div style="background:var(--s2);border:1px solid var(--bdr);border-radius:12px;padding:1rem;margin-bottom:1.1rem;">
+          <div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">${b.svc}</div>
+          <div style="color:var(--acc);font-size:.77rem;font-weight:700;margin-bottom:.3rem;">${b.sub}</div>
+          <div style="color:var(--mu);font-size:.77rem;line-height:1.65;">
+            👤 ${b.uname} &nbsp;|&nbsp; 📞 ${b.uphone}<br>
+            📅 ${b.date} at ${b.time}<br>
+            📍 ${b.addr}${b.lmk?' &nbsp;|&nbsp; 🏷️ '+b.lmk:''}
+          </div>
+          <div style="display:flex;align-items:center;gap:.5rem;margin-top:.55rem;">
+            <span style="font-family:monospace;font-size:.68rem;color:var(--mu2);">${b.id}</span>
+            <span class="badge b-${b.status}" style="font-size:.65rem;">${b.status.charAt(0).toUpperCase()+b.status.slice(1)}</span>
+            ${log.length?`<span class="badge b-reopened" style="font-size:.65rem;">🔄 Reopened ${log.length}x before</span>`:''}
+          </div>
+        </div>
+        <!-- Reopen to Status -->
+        <div style="margin-bottom:1rem;">
+          <label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Reopen to Status</label>
+          <select id="reopen-status" style="width:100%;background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.65rem 1rem;color:var(--tx);font-family:var(--fb);font-size:.86rem;outline:none;appearance:auto;">
+            <option value="pending">⏳ Pending — Needs fresh review by admin</option>
+            <option value="confirmed">✅ Confirmed — Reassign a professional</option>
+          </select>
+        </div>
+        <!-- Reason -->
+        <div style="margin-bottom:1rem;">
+          <label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Reason for Reopening <span style="color:var(--rd);">*</span></label>
+          <textarea id="reopen-reason" rows="3" placeholder="e.g. Customer reported AC is not cooling after service. Reopening for re-inspection…" style="width:100%;background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.65rem 1rem;color:var(--tx);font-family:var(--fb);font-size:.86rem;outline:none;resize:vertical;"></textarea>
+        </div>
+        <!-- Investigation Note (internal) -->
+        <div style="margin-bottom:1rem;">
+          <label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Internal Note (optional)</label>
+          <textarea id="reopen-internal" rows="2" placeholder="e.g. Call employee Murugan to clarify issue before re-dispatch. Check spare part availability." style="width:100%;background:var(--s3);border:1px solid rgba(139,92,246,.25);border-radius:10px;padding:.65rem 1rem;color:var(--tx);font-family:var(--fb);font-size:.86rem;outline:none;resize:vertical;"></textarea>
+          <p style="font-size:.68rem;color:var(--mu2);margin-top:.25rem;">💼 Admin-only note — not sent to customer</p>
+        </div>
+        <!-- WhatsApp notify -->
+        <div style="display:flex;align-items:center;gap:.7rem;margin-bottom:1.2rem;padding:.7rem 1rem;background:rgba(37,211,102,.06);border:1px solid rgba(37,211,102,.2);border-radius:10px;">
+          <input type="checkbox" id="reopen-wa" checked style="width:16px;height:16px;accent-color:#25d366;flex-shrink:0;">
+          <label for="reopen-wa" style="font-size:.82rem;color:var(--tx);cursor:pointer;">💬 Notify customer via WhatsApp about reopening</label>
+        </div>
+        ${prevHistoryHtml}
+        <!-- Action buttons -->
+        <div style="display:flex;gap:.8rem;">
+          <button onclick="document.getElementById('reopenModal').remove();document.body.style.overflow='';" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;font-size:.88rem;">Cancel</button>
+          <button onclick="confirmReopen('${bkId}')" style="flex:2;background:var(--pu);color:#fff;border:none;padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.88rem;">🔄 Reopen &amp; Investigate</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal){modal.remove();document.body.style.overflow='';}});
+  setTimeout(()=>document.getElementById('reopen-reason')?.focus(),250);
+}
+
+function confirmReopen(bkId){
+  const reason=document.getElementById('reopen-reason')?.value?.trim();
+  const internalNote=document.getElementById('reopen-internal')?.value?.trim()||'';
+  const targetStatus=document.getElementById('reopen-status')?.value||'pending';
+  const sendWa=document.getElementById('reopen-wa')?.checked!==false;
+  if(!reason){
+    const ta=document.getElementById('reopen-reason');
+    if(ta){ta.style.borderColor='var(--rd)';ta.focus();}
+    return toast('Please enter a reason for reopening.','err');
+  }
+  const b=DB.findBk(bkId);if(!b)return;
+  // Build log entry
+  const entry={
+    fromStatus:b.status,
+    toStatus:targetStatus,
+    reason,
+    internalNote:internalNote||'',
+    on:fmtDT(new Date())
+  };
+  const newLog=[...(b.reopenLog||[]),entry];
+  DB.upBk(bkId,{
+    status:targetStatus,
+    reopenLog:newLog,
+    lastModified:fmtDT(new Date()),
+    // Clear closed-by when reopening so investigation starts fresh
+    closedByEmp:b.closedByEmp||'',
+    reopenedOn:fmtDT(new Date())
+  });
+  // WhatsApp notification
+  if(sendWa&&b.uphone){
+    const waMsg=`🔄 *ServeNow Booking Update*\n\nHello ${b.uname},\n\nYour booking *${b.id}* for *${b.svc} — ${b.sub}* has been *reopened* for further review by our team.\n\n📋 *Reason:* ${reason}\n\n📅 Original Date: ${b.date} at ${b.time}\n📍 Address: ${b.addr}\n\nOur team will contact you shortly. We apologise for any inconvenience.\n\nServeNow Team 🙏`;
+    openWhatsApp(b.uphone,waMsg);
+  }
+  document.getElementById('reopenModal')?.remove();
+  document.body.style.overflow='';
+  renderAdminDash();renderAdminBks();buildAdminNav();
+  SVCS.forEach(s=>{if($('list-svc-'+s.id)&&$('ap-svc-'+s.id)?.classList.contains('on'))renderSvcPanel(s.id,s.name);});
+  toast('🔄 Booking #'+bkId+' reopened for investigation!');
+}
+
+function showReopenHistory(bkId){
+  const b=DB.findBk(bkId);if(!b)return;
+  const log=b.reopenLog||[];
+  if(!log.length)return toast('No reopen history for this booking.','err');
+  const old=document.getElementById('reopenHistModal');if(old)old.remove();
+  document.body.style.overflow='hidden';
+  const modal=document.createElement('div');
+  modal.id='reopenHistModal';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9001;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+  modal.innerHTML=`
+    <div style="background:var(--s1);border:1px solid rgba(139,92,246,.35);border-radius:20px;width:100%;max-width:480px;max-height:calc(100vh - 3rem);overflow-y:auto;animation:upIn .3s ease;">
+      <div style="padding:1.2rem 1.5rem;border-bottom:1px solid var(--bdr);display:flex;align-items:center;gap:.8rem;background:rgba(139,92,246,.08);border-radius:20px 20px 0 0;">
+        <div style="font-size:1.5rem;">📋</div>
+        <div style="flex:1;">
+          <h2 style="font-family:var(--fh);font-weight:900;font-size:1.05rem;color:var(--pu);">Reopen History</h2>
+          <p style="color:var(--mu);font-size:.75rem;">${b.id} &nbsp;|&nbsp; ${b.svc} — ${b.sub}</p>
+        </div>
+        <button onclick="document.getElementById('reopenHistModal').remove();document.body.style.overflow='';" style="background:var(--s2);border:1px solid var(--bdr);color:var(--mu);width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center;">✕</button>
+      </div>
+      <div style="padding:1.2rem;">
+        <div style="display:flex;align-items:center;gap:.7rem;padding:.75rem 1rem;background:var(--s2);border-radius:10px;margin-bottom:1rem;">
+          <span style="font-size:1.5rem;">🔄</span>
+          <div>
+            <div style="font-size:.82rem;font-weight:700;">${log.length} reopen event${log.length>1?'s':''} recorded</div>
+            <div style="font-size:.73rem;color:var(--mu);">Full history with reasons &amp; timestamps</div>
+          </div>
+        </div>
+        ${log.map((r,i)=>`
+          <div style="background:var(--s2);border:1px solid rgba(139,92,246,.2);border-radius:12px;padding:1rem;margin-bottom:.75rem;position:relative;">
+            <div style="position:absolute;top:-1px;left:1.1rem;background:var(--pu);color:#fff;font-size:.63rem;font-weight:800;padding:.1rem .45rem;border-radius:0 0 6px 6px;">Reopen #${i+1}</div>
+            <div style="margin-top:.5rem;display:flex;align-items:center;gap:.5rem;margin-bottom:.5rem;">
+              <span class="badge b-${r.fromStatus}" style="font-size:.65rem;">${r.fromStatus.charAt(0).toUpperCase()+r.fromStatus.slice(1)}</span>
+              <span style="color:var(--mu);font-size:.78rem;">→</span>
+              <span class="badge b-${r.toStatus}" style="font-size:.65rem;">${r.toStatus.charAt(0).toUpperCase()+r.toStatus.slice(1)}</span>
+            </div>
+            <div style="font-size:.82rem;line-height:1.6;color:rgba(240,240,248,.85);margin-bottom:.35rem;"><strong style="color:var(--acc);">Reason:</strong> ${r.reason}</div>
+            ${r.internalNote?`<div style="font-size:.78rem;line-height:1.55;color:var(--mu);margin-bottom:.35rem;padding:.5rem .7rem;background:rgba(139,92,246,.07);border-radius:7px;border-left:2px solid rgba(139,92,246,.35);">💼 <strong>Internal:</strong> ${r.internalNote}</div>`:''}
+            <div style="font-size:.7rem;color:var(--mu2);">🕒 ${r.on}</div>
+          </div>`).join('')}
+        <button onclick="document.getElementById('reopenHistModal').remove();document.body.style.overflow='';" style="width:100%;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.72rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;margin-top:.3rem;">Close</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  modal.addEventListener('click',e=>{if(e.target===modal){modal.remove();document.body.style.overflow='';}});
 }
 
 // Per-service panels
