@@ -811,6 +811,15 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .nav-usr{display:flex;align-items:center;gap:.5rem;background:rgba(249,115,22,.1);border:1px solid rgba(249,115,22,.25);padding:.33rem .9rem .33rem .45rem;border-radius:50px;cursor:pointer;font-size:.82rem;transition:.2s;}
 .nav-usr:hover{background:rgba(249,115,22,.2);}
 .n-av{width:26px;height:26px;background:var(--acc);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.7rem;font-family:var(--fh);}
+.nav-usr-wrap{position:relative;}
+.nav-usr-menu{position:absolute;top:calc(100% + 10px);right:0;background:var(--s1);border:1px solid var(--bdr);border-radius:14px;min-width:230px;box-shadow:0 14px 34px rgba(0,0,0,.45);z-index:600;overflow:hidden;display:none;}
+.nav-usr-menu.on{display:block;animation:upIn .18s ease;}
+.nav-usr-menu .nm-head{padding:.9rem 1.1rem;border-bottom:1px solid var(--bdr);background:rgba(249,115,22,.06);}
+.nav-usr-menu .nm-name{font-weight:700;font-size:.88rem;font-family:var(--fh);}
+.nav-usr-menu .nm-email{color:var(--mu);font-size:.73rem;margin-top:.15rem;word-break:break-all;}
+.nav-usr-menu .nm-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--tx);padding:.75rem 1.1rem;font-size:.83rem;cursor:pointer;font-family:var(--fb);transition:.15s;}
+.nav-usr-menu .nm-item:hover{background:rgba(249,115,22,.1);color:var(--acc);}
+.nav-usr-menu .nm-item.danger:hover{background:rgba(239,68,68,.1);color:var(--rd);}
 
 /* ── AUTH ── */
 .auth-bg{position:fixed;inset:0;background:radial-gradient(ellipse 70% 60% at 50% -5%,rgba(249,115,22,.1) 0%,transparent 65%);pointer-events:none;}
@@ -1884,6 +1893,14 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
         <div class="dm-hdr"><div><h1>Notifications Sent</h1><p>WhatsApp, Email &amp; SMS log</p></div></div>
         <div class="tc"><div class="tc-hdr"><h3>Notification History</h3></div><div id="a-notif-list"></div></div>
       </div>
+      <!-- DELETION HISTORY -->
+      <div class="dpanel" id="ap-history">
+        <div class="dm-hdr"><div><h1>🗑️ Deletion History</h1><p>Bookings deleted from the system, with reason &amp; original details</p></div></div>
+        <div class="tc">
+          <div class="tc-hdr"><h3 id="a-history-cnt">0 Deleted Bookings</h3></div>
+          <div id="a-history-list"></div>
+        </div>
+      </div>
       <!-- EMPLOYEES TAB -->
       <div class="dpanel" id="ap-employees">
         <div class="dm-hdr">
@@ -2008,6 +2025,8 @@ const DB={
   reviews:()=>DB.g('reviews'),
   addReview:r=>{const a=DB.reviews();a.unshift({...r,id:'RV'+Date.now(),time:fmtDT(new Date()),approved:false,featured:false});DB.s('reviews',a);},
   upReview:(id,c)=>{const a=DB.reviews();const i=a.findIndex(x=>x.id===id);if(i>-1){a[i]={...a[i],...c};DB.s('reviews',a);}},
+  delHistory:()=>DB.g('delHistory'),
+  addDelHistory:rec=>{const a=DB.delHistory();a.unshift({...rec,histId:'DH'+Date.now()});DB.s('delHistory',a.slice(0,500));},
 };
 
 // Seed
@@ -2437,10 +2456,32 @@ function updateStats(){$('hs-bk').textContent=DB.bks().length+'+';}
 function updateNavForUser(){
   ['navR','svcNavR','innerNavR'].forEach(rid=>{
     const r=$(rid);if(!r) return;
-    if(CU){const i=(CU.fn[0]+(CU.ln?CU.ln[0]:'')).toUpperCase();r.innerHTML=`<div class="nav-usr" onclick="pg('custPg')"><div class="n-av">${i}</div>${CU.fn}</div>`;}
+    if(CU){
+      const i=(CU.fn[0]+(CU.ln?CU.ln[0]:'')).toUpperCase();
+      r.innerHTML=`<div class="nav-usr-wrap">
+        <div class="nav-usr" onclick="toggleNavMenu(event,'${rid}')"><div class="n-av">${i}</div>${CU.fn} <span style="font-size:.6rem;opacity:.65;">▾</span></div>
+        <div class="nav-usr-menu" id="${rid}-menu">
+          <div class="nm-head"><div class="nm-name">${CU.fn} ${CU.ln||''}</div><div class="nm-email">${CU.email}</div></div>
+          <button class="nm-item" onclick="closeNavMenus();pg('custPg');">👤 My Account</button>
+          <button class="nm-item" onclick="closeNavMenus();pg('custPg');setTimeout(()=>cpanel&&cpanel('orders'),50);">📋 My Bookings</button>
+          <button class="nm-item danger" onclick="closeNavMenus();doLogout();">🚪 Logout</button>
+        </div>
+      </div>`;
+    }
     else r.innerHTML=`<button class="n-pill" onclick="showAuth('login')">Sign In</button><button class="n-solid" onclick="showAuth('reg')">Register Free</button>`;
   });
 }
+function toggleNavMenu(e,rid){
+  e.stopPropagation();
+  const menu=document.getElementById(rid+'-menu');if(!menu)return;
+  const wasOn=menu.classList.contains('on');
+  closeNavMenus();
+  if(!wasOn)menu.classList.add('on');
+}
+function closeNavMenus(){
+  document.querySelectorAll('.nav-usr-menu').forEach(m=>m.classList.remove('on'));
+}
+document.addEventListener('click',closeNavMenus);
 
 // ══════════════════════════════════════
 // AUTH
@@ -3106,6 +3147,7 @@ function buildAdminNav(){
     <div class="sb-lnk" onclick="apanel('contacts',this)"><span class="sb-ic">✉️</span> Contact Messages${unreadContacts>0?`<span class="sb-badge">${unreadContacts}</span>`:''}</div>
     <div class="sb-lnk" onclick="apanel('reviews',this)"><span class="sb-ic">⭐</span> Reviews${newReviews>0?`<span class="sb-badge">${newReviews}</span>`:''}</div>
     <div class="sb-lnk" onclick="apanel('notifications',this)"><span class="sb-ic">🔔</span> Notifications${notifs>0?`<span class="sb-badge">${Math.min(notifs,99)}</span>`:''}</div>
+    <div class="sb-lnk" onclick="apanel('history',this)"><span class="sb-ic">🗑️</span> Deletion History</div>
     <div class="sb-sep"></div>
     <div class="sb-sec-label">By Service</div>
     ${perSvc.map(s=>`
@@ -3146,6 +3188,7 @@ function apanel(n,el){
   if(n==='contacts') renderAdminContacts();
   if(n==='reviews') renderAdminReviews();
   if(n==='notifications') renderAdminNotifs();
+  if(n==='history') renderDelHistory();
   if(n==='services') renderAdminSvcs();
   if(n==='revenue'){renderRevenueDash();}
   if(n==='prices') renderPriceMgmt();
@@ -3955,8 +3998,72 @@ function confirmReservation(){
   toast(status==='confirmed'?'✅ Booking confirmed & customer notified!':status==='inprogress'?'🔧 Marked in progress!':status==='completed'?'🏆 Booking completed!':'❌ Booking cancelled.');
 }
 function aDel(id){
-  if(!confirm('Delete this booking permanently?'))return;
-  DB.delBk(id);renderAdminBks();renderAdminDash();buildAdminNav();updateStats();toast('Booking deleted.');
+  var b=DB.findBk(id);if(!b)return;
+  var old=document.getElementById('delModal');if(old)old.remove();
+  document.body.style.overflow='hidden';
+  var m=document.createElement('div');
+  m.id='delModal';
+  m.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:9000;display:flex;align-items:center;justify-content:center;padding:1.5rem;overflow-y:auto;';
+  var html='<div style="background:var(--s1);border:1px solid rgba(239,68,68,.35);border-radius:20px;width:100%;max-width:460px;max-height:92vh;overflow-y:auto;overscroll-behavior:contain;animation:upIn .3s ease;">'
+    +'<div style="background:rgba(239,68,68,.1);padding:1.2rem 1.5rem;border-bottom:1px solid var(--bdr);border-radius:20px 20px 0 0;display:flex;align-items:center;gap:1rem;">'
+    +'<div style="font-size:2rem;">🗑️</div>'
+    +'<div style="flex:1;"><h2 style="font-family:var(--fh);font-weight:900;font-size:1.1rem;color:var(--rd);">Delete Booking</h2>'
+    +'<p style="color:var(--mu);font-size:.76rem;margin-top:.1rem;">Removed from active bookings — a record is kept in History</p></div>'
+    +'<button id="delCloseBtn" style="background:var(--s2);border:1px solid var(--bdr);color:var(--mu);width:32px;height:32px;border-radius:50%;font-size:1rem;cursor:pointer;">✕</button>'
+    +'</div>'
+    +'<div style="padding:1.4rem;">'
+    +'<div style="background:var(--s2);border:1px solid var(--bdr);border-radius:12px;padding:1rem;margin-bottom:1.1rem;">'
+    +'<div style="font-family:var(--fh);font-weight:700;font-size:.92rem;">'+b.svc+' — <span style="color:var(--acc);">'+b.sub+'</span></div>'
+    +'<div style="color:var(--mu);font-size:.77rem;line-height:1.65;margin-top:.3rem;">👤 '+b.uname+' | 📞 '+b.uphone+'<br>📅 '+b.date+' at '+b.time+'</div>'
+    +'<span style="font-family:monospace;font-size:.68rem;color:var(--mu2);">'+b.id+'</span>'
+    +'</div>'
+    +'<div style="margin-bottom:1.2rem;">'
+    +'<label style="display:block;font-size:.71rem;color:var(--mu);font-weight:700;letter-spacing:.08em;text-transform:uppercase;margin-bottom:.33rem;">Reason for Deletion <span style="color:var(--rd);">*</span></label>'
+    +'<textarea id="del-reason" rows="3" placeholder="e.g. Duplicate booking, customer cancelled by phone..." style="width:100%;background:var(--s3);border:1px solid var(--bdr);border-radius:10px;padding:.65rem 1rem;color:var(--tx);font-family:var(--fb);font-size:.86rem;outline:none;resize:vertical;box-sizing:border-box;"></textarea></div>'
+    +'<div style="display:flex;gap:.8rem;">'
+    +'<button id="delCancelBtn" style="flex:1;background:var(--s2);border:1px solid var(--bdr);color:var(--mu);padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:600;cursor:pointer;font-size:.88rem;">Cancel</button>'
+    +'<button id="delConfirmBtn" style="flex:2;background:var(--rd);color:#fff;border:none;padding:.78rem;border-radius:10px;font-family:var(--fh);font-weight:700;cursor:pointer;font-size:.88rem;">🗑️ Delete Permanently</button>'
+    +'</div></div></div>';
+  m.innerHTML=html;
+  document.body.appendChild(m);
+  document.getElementById('delCloseBtn').addEventListener('click',function(){m.remove();document.body.style.overflow='';});
+  document.getElementById('delCancelBtn').addEventListener('click',function(){m.remove();document.body.style.overflow='';});
+  document.getElementById('delConfirmBtn').addEventListener('click',function(){confirmDelete(id);});
+  m.addEventListener('click',function(e){if(e.target===m){m.remove();document.body.style.overflow='';}});
+  setTimeout(function(){var ta=document.getElementById('del-reason');if(ta)ta.focus();},200);
+}
+function confirmDelete(id){
+  var reason=document.getElementById('del-reason')&&document.getElementById('del-reason').value.trim();
+  if(!reason){
+    var ta=document.getElementById('del-reason');
+    if(ta){ta.style.borderColor='var(--rd)';ta.style.outline='2px solid rgba(239,68,68,.3)';ta.focus();}
+    return toast('Please enter a reason for deletion.','err');
+  }
+  var b=DB.findBk(id);if(!b)return;
+  DB.addDelHistory({...b,deleteReason:reason,deletedOn:fmtDT(new Date()),deletedBy:isAdmin?'Admin':'Employee'});
+  DB.delBk(id);
+  var modal=document.getElementById('delModal');if(modal)modal.remove();
+  document.body.style.overflow='';
+  renderAdminBks();renderAdminDash();buildAdminNav();updateStats();
+  toast('🗑️ Booking deleted — record saved in History.');
+}
+function renderDelHistory(){
+  const list=DB.delHistory();
+  const el=$('a-history-list');if(!el)return;
+  if($('a-history-cnt'))$('a-history-cnt').textContent=list.length+' Deleted Booking'+(list.length!==1?'s':'');
+  el.innerHTML=list.length?list.map(h=>`<div class="br">
+    <div><div class="br-svc">${h.svc}</div><div class="br-sub">${h.sub}</div>
+    <div class="br-meta">👤 ${h.uname} &nbsp;|&nbsp; 📞 ${h.uphone} &nbsp;|&nbsp; 📧 ${h.uemail}</div>
+    <div class="br-meta">📅 ${h.date} at ${h.time} &nbsp;|&nbsp; 📍 ${h.addr}</div>
+    <div class="br-id">${h.id} • Originally created: ${h.created}</div>
+    <div style="background:rgba(239,68,68,.08);border:1px solid rgba(239,68,68,.25);border-radius:8px;padding:.5rem .85rem;margin-top:.4rem;font-size:.76rem;">
+      <div style="color:var(--rd);font-weight:700;margin-bottom:.15rem;">🗑️ Deletion Reason:</div>
+      <div style="color:var(--tx);font-style:italic;">"${h.deleteReason}"</div>
+      <div style="color:var(--mu2);font-size:.68rem;margin-top:.3rem;">Deleted by ${h.deletedBy} on ${h.deletedOn}</div>
+    </div>
+    </div>
+    <span class="badge b-${h.status}">${h.status==='inprogress'?'In Progress':h.status.charAt(0).toUpperCase()+h.status.slice(1)}</span>
+  </div>`).join(''):empBox('No deleted bookings yet.');
 }
 
 // ── REOPEN BOOKING ──
