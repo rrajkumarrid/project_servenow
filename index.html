@@ -4780,7 +4780,7 @@ buildInvoiceHTML = function(bk, amount, gst) {
   const gstAmt = amount && gst ? Math.round(amount * gst / 100) : 0;
   const total = amount ? (amount + gstAmt) : null;
   const orderDate = bk.created ? bk.created.split(',')[0].trim() : bk.date;
-  const qrPayload = JSON.stringify({ id: bk.id, svc: bk.svc, cust: bk.uname, date: bk.date, status: bk.status });
+  const qrPayload = window.location.origin+window.location.pathname+'?track='+encodeURIComponent(bk.id);
   const qrUrl = genQRDataURL(qrPayload, 110);
   const extras = bk.extraCharges || [];
   const extraTotal = bk.extraTotal || 0;
@@ -5035,6 +5035,18 @@ updateStats();
 updateNavForUser();
 hideMobNavs();
 attachFieldClearers();
+// Arrived via a QR code / shared tracking link — auto-open the tracker for that booking
+(function(){
+  const trackId=new URLSearchParams(window.location.search).get('track');
+  if(trackId){
+    setTimeout(()=>{
+      showPublicTracker();
+      const input=document.getElementById('pub-track-in');
+      if(input){input.value=trackId;}
+      doPubTrack();
+    },300);
+  }
+})();
 // How-it-works scroll animation
 (function(){
   const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');}),{threshold:.15});
