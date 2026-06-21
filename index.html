@@ -66,6 +66,7 @@ function loadEmployeeDash(emp) {
   $('emp-pf-role').value = emp.role;
   $('emp-pf-phone').value = emp.phone;
   showMobNav('employee');
+  renderGlobalAcctChip();
   epanel('overview', document.querySelector('#empSidebar .sb-lnk'));
 }
 
@@ -812,7 +813,10 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .nav-usr:hover{background:rgba(249,115,22,.2);}
 .n-av{width:26px;height:26px;background:var(--acc);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.7rem;font-family:var(--fh);}
 .nav-usr-wrap{position:relative;}
-.nav-usr-menu{position:absolute;top:calc(100% + 10px);right:0;background:var(--s1);border:1px solid var(--bdr);border-radius:14px;min-width:230px;box-shadow:0 14px 34px rgba(0,0,0,.45);z-index:600;overflow:hidden;display:none;}
+.nav-usr-menu{position:absolute;top:calc(100% + 10px);right:0;background:var(--s1);border:1px solid var(--bdr);border-radius:14px;min-width:240px;max-width:300px;max-height:75vh;overflow-y:auto;box-shadow:0 14px 34px rgba(0,0,0,.45);z-index:600;display:none;}
+.nav-usr-menu .nm-sep{height:1px;background:var(--bdr);margin:.3rem 0;}
+.nav-usr-menu .nm-sec-label{padding:.5rem 1.1rem .25rem;font-size:.62rem;color:var(--mu2);font-weight:700;letter-spacing:.07em;text-transform:uppercase;}
+.nav-usr-menu .nm-item{display:flex;align-items:center;justify-content:space-between;gap:.5rem;}
 .nav-usr-menu.on{display:block;animation:upIn .18s ease;}
 .nav-usr-menu .nm-head{padding:.9rem 1.1rem;border-bottom:1px solid var(--bdr);background:rgba(249,115,22,.06);}
 .nav-usr-menu .nm-name{font-weight:700;font-size:.88rem;font-family:var(--fh);}
@@ -820,6 +824,13 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .nav-usr-menu .nm-item{display:block;width:100%;text-align:left;background:none;border:none;color:var(--tx);padding:.75rem 1.1rem;font-size:.83rem;cursor:pointer;font-family:var(--fb);transition:.15s;}
 .nav-usr-menu .nm-item:hover{background:rgba(249,115,22,.1);color:var(--acc);}
 .nav-usr-menu .nm-item.danger:hover{background:rgba(239,68,68,.1);color:var(--rd);}
+#globalAcctChip{position:fixed;top:14px;right:14px;z-index:9700;}
+#globalAcctChip:empty{display:none;}
+#globalAcctChip .nav-usr{background:rgba(10,10,16,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);box-shadow:0 4px 18px rgba(0,0,0,.45);}
+@media(max-width:768px){
+  #globalAcctChip{top:10px;right:10px;}
+  #globalAcctChip .nav-usr span{max-width:64px;}
+}
 
 /* ── AUTH ── */
 .auth-bg{position:fixed;inset:0;background:radial-gradient(ellipse 70% 60% at 50% -5%,rgba(249,115,22,.1) 0%,transparent 65%);pointer-events:none;}
@@ -1090,7 +1101,9 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .out-btn{width:100%;background:none;border:1px solid var(--bdr2);color:var(--mu);padding:.54rem;border-radius:8px;font-family:var(--fb);font-size:.81rem;cursor:pointer;transition:.2s;}
 .out-btn:hover{border-color:var(--rd);color:var(--rd);}
 
-.dmain{margin-left:238px;flex:1;padding:1.9rem 2.2rem;min-height:100vh;background:var(--bg);}
+.dmain{margin-left:0;flex:1;padding:1.9rem 2.2rem;min-height:100vh;background:var(--bg);}
+.sidebar{display:none!important;}
+.mob-nav{display:none!important;}
 .dm-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:1.8rem;flex-wrap:wrap;gap:1rem;}
 .dm-hdr h1{font-family:var(--fh);font-size:1.55rem;font-weight:900;letter-spacing:-.02em;}
 .dm-hdr p{color:var(--mu);font-size:.83rem;margin-top:.18rem;}
@@ -1329,15 +1342,12 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
   .bform{position:static;}
 }
 @media(max-width:900px){
-  .sidebar{width:195px;}.dmain{margin-left:195px;padding:1.4rem;}
   .contact-grid{grid-template-columns:1fr;}
   .car-grid{grid-template-columns:repeat(3,1fr);}
 }
 @media(max-width:768px){
-  /* Hide desktop sidebar, show mobile nav */
-  .sidebar{display:none!important;}
-  .dmain{margin-left:0!important;padding:1rem 1rem 80px!important;}
-  .mob-nav{display:flex;}
+  /* Sidebar & mobile bottom nav fully removed — navigation lives in the top account dropdown */
+  .dmain{padding:1rem 1rem 1.4rem!important;}
   /* Nav */
   .nav-links{display:none;}
   .nav-r{display:none;}
@@ -1999,6 +2009,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 </div>
 
 <div class="toast" id="toast"></div>
+<div id="globalAcctChip"></div>
 
 <script>
 // ══════════════════════════════════════
@@ -2456,20 +2467,71 @@ function updateStats(){$('hs-bk').textContent=DB.bks().length+'+';}
 function updateNavForUser(){
   ['navR','svcNavR','innerNavR'].forEach(rid=>{
     const r=$(rid);if(!r) return;
-    if(CU){
-      const i=(CU.fn[0]+(CU.ln?CU.ln[0]:'')).toUpperCase();
-      r.innerHTML=`<div class="nav-usr-wrap">
-        <div class="nav-usr" onclick="toggleNavMenu(event,'${rid}')"><div class="n-av">${i}</div>${CU.fn} <span style="font-size:.6rem;opacity:.65;">▾</span></div>
-        <div class="nav-usr-menu" id="${rid}-menu">
-          <div class="nm-head"><div class="nm-name">${CU.fn} ${CU.ln||''}</div><div class="nm-email">${CU.email}</div></div>
-          <button class="nm-item" onclick="closeNavMenus();pg('custPg');">👤 My Account</button>
-          <button class="nm-item" onclick="closeNavMenus();pg('custPg');setTimeout(()=>cpanel&&cpanel('orders'),50);">📋 My Bookings</button>
-          <button class="nm-item danger" onclick="closeNavMenus();doLogout();">🚪 Logout</button>
-        </div>
-      </div>`;
-    }
+    if(CU) r.innerHTML='';
     else r.innerHTML=`<button class="n-pill" onclick="showAuth('login')">Sign In</button><button class="n-solid" onclick="showAuth('reg')">Register Free</button>`;
   });
+  renderGlobalAcctChip();
+}
+function renderGlobalAcctChip(){
+  const el=$('globalAcctChip');if(!el)return;
+  let name='',sub='',menu='';
+  if(isAdmin){
+    name='Administrator';sub='Full Access';
+    const bks=DB.bks();
+    const pending=bks.filter(b=>b.status==='pending').length;
+    const notifs=DB.notifs().filter(n=>!n.read).length;
+    const unreadContacts=DB.contacts().filter(c=>!c.read).length;
+    const newReviews=DB.reviews().filter(r=>!r.approved&&!r.rejected).length;
+    const empActive=EMP_DB.list().filter(e=>e.status==='active').length;
+    const badge=n=>n>0?`<span class="sb-badge">${Math.min(n,99)}</span>`:'';
+    menu=`
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('dash',null);">📊 Dashboard</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('bookings',null);">📋 All Bookings ${badge(pending)}</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('customers',null);">👥 Customers</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('contacts',null);">✉️ Contact Messages ${badge(unreadContacts)}</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('reviews',null);">⭐ Reviews ${badge(newReviews)}</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('notifications',null);">🔔 Notifications ${badge(notifs)}</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('history',null);">🗑️ Deletion History</button>
+      <div class="nm-sep"></div>
+      <div class="nm-sec-label">By Service</div>
+      ${SVCS.map(s=>{const c=bks.filter(b=>b.svc===s.name&&b.status==='pending').length;return`<button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('svc-${s.id}',null);">${s.em} ${s.name} ${badge(c)}</button>`;}).join('')}
+      <div class="nm-sep"></div>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('services',null);">🛠️ Catalogue</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('prices',null);">💲 Manage Prices</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('revenue',null);">💰 Revenue</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('adminPg');apanel('employees',null);">👷 Employees ${badge(empActive)}</button>
+      <div class="nm-sep"></div>
+      <button class="nm-item danger" onclick="closeNavMenus();doLogout();">🚪 Logout</button>`;
+  } else if(CUR_EMP){
+    name=CUR_EMP.name;sub=CUR_EMP.role||'Employee';
+    menu=`
+      <button class="nm-item" onclick="closeNavMenus();pg('empPg');epanel('overview',null);">🏠 Overview</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('empPg');epanel('mytasks',null);">📋 My Tasks</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('empPg');epanel('notifications',null);">🔔 Notifications</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('empPg');epanel('completed',null);">🏆 Completed</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('empPg');epanel('profile',null);">👤 My Profile</button>
+      <div class="nm-sep"></div>
+      <button class="nm-item danger" onclick="closeNavMenus();doLogout();">🚪 Logout</button>`;
+  } else if(CU){
+    name=CU.fn+' '+(CU.ln||'');sub=CU.email;
+    menu=`
+      <button class="nm-item" onclick="closeNavMenus();pg('custPg');cpanel('overview',null);">🏠 Overview</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('custPg');cpanel('book',null);">➕ Book Service</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('custPg');cpanel('orders',null);">📋 My Orders</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('custPg');cpanel('track',null);">🔍 Track Order</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('custPg');cpanel('notifications',null);">🔔 Notifications</button>
+      <button class="nm-item" onclick="closeNavMenus();pg('custPg');cpanel('profile',null);">👤 Profile</button>
+      <div class="nm-sep"></div>
+      <button class="nm-item danger" onclick="closeNavMenus();doLogout();">🚪 Logout</button>`;
+  } else { el.innerHTML=''; return; }
+  const initials=(name.trim().split(/\s+/).map(p=>p[0]).join('').slice(0,2)||'?').toUpperCase();
+  el.innerHTML=`<div class="nav-usr-wrap">
+    <div class="nav-usr" onclick="toggleNavMenu(event,'globalAcct')"><div class="n-av">${initials}</div><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</span> <span style="font-size:.6rem;opacity:.65;">▾</span></div>
+    <div class="nav-usr-menu" id="globalAcct-menu">
+      <div class="nm-head"><div class="nm-name">${name}</div><div class="nm-email">${sub}</div></div>
+      ${menu}
+    </div>
+  </div>`;
 }
 function toggleNavMenu(e,rid){
   e.stopPropagation();
@@ -3171,7 +3233,7 @@ function buildAdminNav(){
 // ADMIN DASHBOARD
 // ══════════════════════════════════════
 function loadAdmin(){
-  pg('adminPg');showMobNav('admin');buildAdminNav();
+  pg('adminPg');showMobNav('admin');buildAdminNav();renderGlobalAcctChip();
   // Update mob pending badge
   const pending=DB.bks().filter(b=>b.status==='pending').length;
   const mb=$('mob-pending-badge');
