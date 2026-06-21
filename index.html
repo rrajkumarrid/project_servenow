@@ -3158,28 +3158,30 @@ function custNotifRow(n,idx){
     <div class="notif-ic ${cls[n.channel]||'notif-sms'}">${icons[n.channel]||'📱'}</div>
     <div style="flex:1;">
       <div class="notif-txt"><strong>${(n.channel||'').toUpperCase()}</strong> ${n.bkId?'— '+n.bkId:''} ${!n.read?'<span style="background:var(--acc);color:#fff;font-size:.6rem;padding:.1rem .35rem;border-radius:4px;margin-left:.3rem;">NEW</span>':''}</div>
-      <div class="notif-txt" id="cnotif-msg-${idx}" style="margin-top:.2rem;white-space:pre-wrap;line-height:1.6;">${preview}</div>
-      ${n.msg.length>80?`<button onclick="toggleNotifMsg(${idx},'${n.msg.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')" style="background:none;border:none;color:var(--acc);font-size:.74rem;cursor:pointer;padding:.15rem 0;font-family:var(--fb);" id="cnotif-btn-${idx}">Read more ▾</button>`:''}
+      <div class="notif-txt" id="c-notif-msg-${idx}" style="margin-top:.2rem;white-space:pre-wrap;line-height:1.6;">${preview}</div>
+      ${n.msg.length>80?`<button onclick="toggleNotifMsg('c',${idx},'${n.msg.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')" style="background:none;border:none;color:var(--acc);font-size:.74rem;cursor:pointer;padding:.15rem 0;font-family:var(--fb);" id="c-notif-btn-${idx}">Read more ▾</button>`:''}
       <div class="notif-time">${n.time}</div>
     </div>
   </div>`;
 }
-function toggleNotifMsg(idx,fullMsg){
-  const el=$('cnotif-msg-'+idx);
-  const btn=$('cnotif-btn-'+idx);
+function toggleNotifMsg(prefix,idx,fullMsg){
+  const el=$(prefix+'-notif-msg-'+idx);
+  const btn=$(prefix+'-notif-btn-'+idx);
   if(!el||!btn) return;
   const isExpanded=el.dataset.expanded==='1';
   el.textContent=isExpanded?fullMsg.substring(0,80)+(fullMsg.length>80?'…':''):fullMsg.replace(/\\n/g,'\n');
   el.dataset.expanded=isExpanded?'0':'1';
   btn.textContent=isExpanded?'Read more ▾':'Show less ▴';
 }
-function notifRow(n){
+function notifRow(n,idx){
   const icons={whatsapp:'💬',email:'📧',sms:'📱',admin_email:'📧'};
   const cls={whatsapp:'notif-wa',email:'notif-email',sms:'notif-sms',admin_email:'notif-email'};
+  const preview=n.msg.substring(0,100)+(n.msg.length>100?'…':'');
   return`<div class="notif-item">
     <div class="notif-ic ${cls[n.channel]||'notif-sms'}">${icons[n.channel]||'📱'}</div>
-    <div><div class="notif-txt"><strong>${n.channel.toUpperCase()}</strong> to ${n.to} ${n.bkId?'('+n.bkId+')':''}</div>
-    <div class="notif-txt" style="margin-top:.2rem;">${n.msg.substring(0,100)}…</div>
+    <div style="flex:1;"><div class="notif-txt"><strong>${n.channel.toUpperCase()}</strong> to ${n.to} ${n.bkId?'('+n.bkId+')':''}</div>
+    <div class="notif-txt" id="a-notif-msg-${idx}" style="margin-top:.2rem;white-space:pre-wrap;line-height:1.6;">${preview}</div>
+    ${n.msg.length>100?`<button onclick="toggleNotifMsg('a',${idx},'${n.msg.replace(/'/g,"\\'").replace(/\n/g,'\\n')}')" style="background:none;border:none;color:var(--acc);font-size:.74rem;cursor:pointer;padding:.15rem 0;font-family:var(--fb);" id="a-notif-btn-${idx}">Read more ▾</button>`:''}
     <div class="notif-time">${n.time}</div></div>
   </div>`;
 }
@@ -4457,7 +4459,7 @@ function renderAdminNotifs(){
   DB.s('notifications',notifs);
   buildAdminNav();
   renderGlobalAcctChip();
-  $('a-notif-list').innerHTML=notifs.length?notifs.map(notifRow).join(''):empBox('No notifications sent yet.');
+  $('a-notif-list').innerHTML=notifs.length?notifs.map((n,idx)=>notifRow(n,idx)).join(''):empBox('No notifications sent yet.');
 }
 function renderAdminSvcs(){
   const bks=DB.bks();
