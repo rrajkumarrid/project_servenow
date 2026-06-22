@@ -744,6 +744,13 @@ body.cursor-click #cursor-arrow svg path{fill:#fff;filter:drop-shadow(0 0 8px rg
 @keyframes ripple{0%{transform:translate(-50%,-50%) scale(0);opacity:.8;}100%{transform:translate(-50%,-50%) scale(2);opacity:0;}}
 @media(max-width:768px){#cursor-arrow,#cursor-ripple{display:none;}*{cursor:auto!important;}}
 
+/* Kill the default browser focus-outline box that shows up behind buttons/nav links after a click
+   (this is the dark square artifact seen trailing the custom cursor). Keyboard users still get a
+   clean visible ring via :focus-visible. */
+button,a,.btn-p,.btn-g,.btn-s,.nav-links a,.nav-logo,.abt,.sb-lnk,.nm-item,.ftab{-webkit-tap-highlight-color:transparent;}
+button:focus,a:focus,.btn-p:focus,.btn-g:focus,.btn-s:focus,.nav-links a:focus,.abt:focus,.sb-lnk:focus,.nm-item:focus,.ftab:focus{outline:none;}
+button:focus-visible,a:focus-visible,.btn-p:focus-visible,.btn-g:focus-visible,.btn-s:focus-visible,.nav-links a:focus-visible,.abt:focus-visible,.sb-lnk:focus-visible,.nm-item:focus-visible,.ftab:focus-visible{outline:2px solid var(--acc);outline-offset:2px;border-radius:inherit;}
+
 /* ── FIELD SHAKE & ERROR ── */
 @keyframes shake{0%,100%{transform:translateX(0);}15%{transform:translateX(-8px);}30%{transform:translateX(8px);}45%{transform:translateX(-6px);}60%{transform:translateX(6px);}75%{transform:translateX(-3px);}90%{transform:translateX(3px);}}
 .field-error input,.field-error select,.field-error textarea{border-color:var(--rd)!important;animation:shake .4s ease;box-shadow:0 0 0 3px rgba(239,68,68,.15);}
@@ -1032,8 +1039,11 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .svcpg{padding:92px 5% 55px;}
 .back-btn{display:inline-flex;align-items:center;gap:.5rem;color:var(--mu);font-size:.82rem;cursor:pointer;margin-bottom:1.8rem;transition:color .2s;font-weight:600;}
 .back-btn:hover{color:var(--acc);}
-.svcpg-top{display:flex;align-items:flex-start;gap:1.4rem;margin-bottom:2.3rem;padding-bottom:1.8rem;border-bottom:1px solid var(--bdr);}
-.svcpg-em{width:76px;height:76px;background:var(--accd);border:1px solid rgba(249,115,22,.2);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:2.3rem;flex-shrink:0;}
+.svcpg-top{display:flex;align-items:flex-start;gap:1.4rem;margin-bottom:2.3rem;padding:2.2rem 2rem;border-radius:20px;border:1px solid var(--bdr);position:relative;overflow:hidden;background:linear-gradient(135deg,var(--svc-tint,rgba(249,115,22,.10)) 0%,transparent 65%),var(--s1);}
+.svcpg-top::before{content:attr(data-em);position:absolute;right:-1.5rem;top:50%;transform:translateY(-50%) rotate(-8deg);font-size:9rem;opacity:.07;line-height:1;pointer-events:none;filter:blur(.5px);}
+.svcpg-top::after{content:'';position:absolute;inset:0;background:radial-gradient(circle at 85% 20%,var(--svc-tint,rgba(249,115,22,.14)) 0%,transparent 55%);pointer-events:none;}
+.svcpg-em{width:76px;height:76px;background:var(--accd);border:1px solid rgba(249,115,22,.2);border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:2.3rem;flex-shrink:0;position:relative;z-index:1;}
+.svcpg-h{position:relative;z-index:1;}
 .svcpg-h h1{font-family:var(--fh);font-size:clamp(1.7rem,3.5vw,2.6rem);font-weight:900;letter-spacing:-.02em;margin-bottom:.4rem;}
 .svcpg-h p{color:var(--mu);font-size:.89rem;line-height:1.72;max-width:600px;}
 .svcpg-badges{display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.85rem;}
@@ -2799,8 +2809,10 @@ function openSvcPage(id){
 function buildSvcPage(){
   const s=curSvc;const today=iso(new Date());
   const isGuest=!CU;
+  const svcTints={ac:'rgba(59,130,246,.16)',construct:'rgba(245,158,11,.16)',cab:'rgba(16,185,129,.16)',elec:'rgba(139,92,246,.16)',sand:'rgba(161,98,7,.18)',clean:'rgba(6,182,212,.16)'};
+  const tint=svcTints[s.id]||'rgba(249,115,22,.14)';
   let h=`<div class="back-btn" onclick="goHome()">← Back to Services</div>
-  <div class="svcpg-top">
+  <div class="svcpg-top" data-em="${s.em}" style="--svc-tint:${tint};">
     <div class="svcpg-em">${s.em}</div>
     <div class="svcpg-h"><h1>${s.name}</h1><p>${s.desc}</p>
       <div class="svcpg-badges">${s.badges.map(b=>`<span class="pgbadge">✓ ${b}</span>`).join('')}</div>
