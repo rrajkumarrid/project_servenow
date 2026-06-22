@@ -23,6 +23,70 @@ function fmtDate(d){return new Date(d).toLocaleDateString('en-IN');}
 function v(id){return document.getElementById(id)?.value?.trim()||'';}
 function $(id){return document.getElementById(id);}
 function empBox(msg){return`<div class="empty-s"><div class="empty-ic">📭</div><p>${msg}</p></div>`;}
+function svgSparkline(data,color,w,h){
+  w=w||72;h=h||30;
+  if(!data||!data.length) return '';
+  const max=Math.max(...data,1),min=Math.min(...data,0);
+  const range=(max-min)||1;
+  const step=data.length>1?w/(data.length-1):0;
+  const pts=data.map((v,i)=>`${(i*step).toFixed(1)},${(h-2-((v-min)/range)*(h-4)).toFixed(1)}`).join(' ');
+  const lastX=(data.length-1)*step;
+  const lastY=h-2-((data[data.length-1]-min)/range)*(h-4);
+  const areaPts=`0,${h} ${pts} ${lastX.toFixed(1)},${h}`;
+  return `<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible;">
+    <polygon points="${areaPts}" fill="${color}" opacity="0.12"/>
+    <polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.6" fill="${color}"/>
+  </svg>`;
+}
+function svgTrendChart(seriesArr,labels,w,h){
+  w=w||760;h=h||220;
+  const pad={l:6,r:6,t:16,b:22};
+  const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
+  const allVals=seriesArr.flatMap(s=>s.data);
+  const max=Math.max(...allVals,1), min=0;
+  const n=labels.length;
+  const stepX=n>1?cw/(n-1):0;
+  const yFor=val=>pad.t+ch-((val-min)/((max-min)||1))*ch;
+  const xFor=i=>pad.l+i*stepX;
+  let gridLines='';
+  for(let g=0;g<=3;g++){
+    const gy=pad.t+ch-(g/3)*ch;
+    gridLines+=`<line x1="${pad.l}" y1="${gy.toFixed(1)}" x2="${w-pad.r}" y2="${gy.toFixed(1)}" stroke="rgba(255,255,255,.06)" stroke-width="1"/>`;
+  }
+  const lines=seriesArr.map(s=>{
+    const pts=s.data.map((v,i)=>`${xFor(i).toFixed(1)},${yFor(v).toFixed(1)}`).join(' ');
+    const areaPts=`${xFor(0).toFixed(1)},${(pad.t+ch).toFixed(1)} ${pts} ${xFor(n-1).toFixed(1)},${(pad.t+ch).toFixed(1)}`;
+    const dots=s.data.map((v,i)=>`<circle cx="${xFor(i).toFixed(1)}" cy="${yFor(v).toFixed(1)}" r="2.4" fill="${s.color}"/>`).join('');
+    return `<polygon points="${areaPts}" fill="${s.color}" opacity="0.07"/>
+      <polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>${dots}`;
+  }).join('');
+  const showEvery=Math.max(1,Math.ceil(n/7));
+  const xLabels=labels.map((l,i)=>i%showEvery===0?`<text x="${xFor(i).toFixed(1)}" y="${h-4}" font-size="9" fill="#8888a8" text-anchor="middle" font-family="Outfit,sans-serif">${l}</text>`:'').join('');
+  return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;overflow:visible;">
+    ${gridLines}${lines}${xLabels}
+  </svg>`;
+}
+function svgDonut(segments,size){
+  size=size||128;
+  const total=segments.reduce((a,s)=>a+s.value,0)||1;
+  const r=size/2, cx=size/2, cy=size/2, strokeW=size*0.22;
+  const innerR=r-strokeW/2;
+  let acc=0;
+  const circumf=2*Math.PI*innerR;
+  const arcs=segments.map(s=>{
+    const frac=s.value/total;
+    const dash=Math.max(frac*circumf-1.5,0);
+    const gap=circumf-dash;
+    const rot=(acc/total)*360-90;
+    acc+=s.value;
+    return s.value>0?`<circle cx="${cx}" cy="${cy}" r="${innerR}" fill="none" stroke="${s.color}" stroke-width="${strokeW}" stroke-dasharray="${dash.toFixed(1)} ${gap.toFixed(1)}" stroke-linecap="round" transform="rotate(${rot.toFixed(1)} ${cx} ${cy})"/>`:'';
+  }).join('');
+  return `<svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">${arcs}
+    <text x="${cx}" y="${cy-1}" text-anchor="middle" font-size="${(size*0.19).toFixed(0)}" font-weight="900" fill="#f0f0f8" font-family="'Playfair Display',serif">${total}</text>
+    <text x="${cx}" y="${cy+size*0.14}" text-anchor="middle" font-size="${(size*0.08).toFixed(0)}" fill="#8888a8" font-family="Outfit,sans-serif">Total</text>
+  </svg>`;
+}
 function genQRDataURL(text,size){
   size=size||100;
   if(typeof QRCode==='undefined') return '';
@@ -1179,6 +1243,30 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .kpi-n{font-family:var(--fh);font-size:1.7rem;font-weight:900;color:var(--acc);}
 .kpi-l{font-size:.68rem;color:var(--mu);margin-top:.1rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
 
+/* ── HERO STAT CARDS (dashboard analytics row) ── */
+.hero-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem;margin-bottom:1.4rem;}
+.hero-stat{border-radius:16px;padding:1.2rem 1.3rem;position:relative;overflow:hidden;border:1px solid var(--bdr);background:var(--s1);}
+.hero-stat::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--hs-tint,rgba(249,115,22,.1)) 0%,transparent 70%);pointer-events:none;}
+.hero-stat-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1;margin-bottom:.6rem;}
+.hero-stat-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:var(--hs-tint,rgba(249,115,22,.14));flex-shrink:0;}
+.hero-stat-chg{font-size:.68rem;font-weight:800;padding:.15rem .45rem;border-radius:6px;}
+.hero-stat-chg.up{color:var(--gr);background:rgba(16,185,129,.12);}
+.hero-stat-chg.down{color:var(--rd);background:rgba(239,68,68,.12);}
+.hero-stat-n{font-family:var(--fh);font-size:1.55rem;font-weight:900;position:relative;z-index:1;}
+.hero-stat-l{font-size:.7rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem;position:relative;z-index:1;}
+.hero-stat-spark{position:relative;z-index:1;}
+@media(max-width:900px){.hero-stat-row{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:600px){.hero-stat-row{grid-template-columns:1fr;}}
+
+/* ── QUICK STAT STRIP ── */
+.quick-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem;margin-bottom:1.4rem;}
+.quick-stat{background:var(--s1);border:1px solid var(--bdr);border-radius:14px;padding:1.1rem;text-align:center;cursor:pointer;transition:.2s;}
+.quick-stat:hover{border-color:rgba(249,115,22,.35);transform:translateY(-2px);}
+.quick-stat-ic{font-size:1.5rem;margin-bottom:.4rem;}
+.quick-stat-n{font-family:var(--fh);font-size:1.4rem;font-weight:900;color:var(--acc);}
+.quick-stat-l{font-size:.7rem;color:var(--mu);font-weight:600;margin-top:.15rem;}
+@media(max-width:900px){.quick-stat-row{grid-template-columns:repeat(2,1fr);}}
+
 /* ── TABLE CARD ── */
 .tc{background:var(--s1);border:1px solid var(--bdr);border-radius:15px;overflow:hidden;margin-bottom:1.4rem;}
 .tc-hdr{padding:.95rem 1.4rem;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--bdr);flex-wrap:wrap;gap:.65rem;}
@@ -1805,6 +1893,11 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
         <div class="dm-hdr"><div><h1>Admin Dashboard</h1><p>Ariyalur &amp; Perambalur — Complete Overview</p></div>
           <button class="export-btn" onclick="exportAll()">⬇ Export All (Excel)</button>
         </div>
+        <div class="hero-stat-row" id="a-hero-stats"></div>
+        <div class="tc">
+          <div class="tc-hdr"><h3>📈 Bookings &amp; Revenue Trend</h3><span style="font-size:.7rem;color:var(--mu);">Last 14 days</span></div>
+          <div id="a-trend-chart" style="padding:1.2rem 1.2rem .5rem;"></div>
+        </div>
         <div class="tc" style="margin-bottom:1.5rem;">
           <div class="tc-hdr"><h3>Period Overview</h3>
             <div class="ftabs">
@@ -1818,10 +1911,11 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
           </div>
           <div class="kpi-row" id="a-kpis" style="padding:1rem;margin:0;"></div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:1.4rem;margin-bottom:1.4rem;" class="admin-charts-grid">
+        <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1.4rem;margin-bottom:1.4rem;" class="admin-charts-grid">
           <div class="tc"><div class="tc-hdr"><h3>Bookings by Service</h3></div><div id="a-svc-bar" style="padding:1.15rem;"></div></div>
-          <div class="tc"><div class="tc-hdr"><h3>Status Breakdown</h3></div><div id="a-st-bar" style="padding:1.15rem;"></div></div>
+          <div class="tc"><div class="tc-hdr"><h3>Status Breakdown</h3></div><div id="a-st-bar" style="padding:1.3rem;"></div></div>
         </div>
+        <div class="quick-stat-row" id="a-quick-stats"></div>
         <div class="tc"><div class="tc-hdr"><h3>Recent Bookings</h3></div><div id="a-recent"></div></div>
         <div class="tc"><div class="tc-hdr"><h3>👷 Tickets by Employee</h3><span style="font-size:.72rem;color:var(--mu);">✅ To Do &nbsp;|&nbsp; 🔧 Active &nbsp;|&nbsp; 🏆 Done</span></div><div id="a-emp-tickets"></div></div>
       </div>
@@ -3381,9 +3475,54 @@ function setPeriod(p,el){
 }
 function renderAdminDash(){
   const all=DB.bks();const bks=filterByPeriod(all,curPeriod);const us=DB.users();
-  const pl={today:"Today's",yesterday:"Yesterday's",week:"This Week's",month:"This Month's",year:"This Year's",all:"All Time"};
+  // ── HERO STAT CARDS (last 7 vs previous 7 days) ──
+  const dayKey=d=>iso(d);
+  const today=new Date();
+  const last7=[],prev7=[];
+  for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);last7.push(dayKey(d));}
+  for(let i=13;i>=7;i--){const d=new Date(today);d.setDate(d.getDate()-i);prev7.push(dayKey(d));}
+  const bksOnDay=day=>all.filter(b=>(b.created||'').slice(0,10)===day || b.date===day);
+  const revOnDay=day=>bksOnDay(day).reduce((s,b)=>s+(b.grandTotal||b.totalAmount||0),0);
+  const last7Counts=last7.map(d=>bksOnDay(d).length);
+  const prev7Counts=prev7.map(d=>bksOnDay(d).length);
+  const last7Rev=last7.map(d=>revOnDay(d));
+  const prev7Rev=prev7.map(d=>revOnDay(d));
+  const last7NewCust=last7.map(d=>us.filter(u=>(u.created||u.joinedOn||'').slice(0,10)===d).length);
+  const prev7NewCust=prev7.map(d=>us.filter(u=>(u.created||u.joinedOn||'').slice(0,10)===d).length);
+  const sum=a=>a.reduce((x,y)=>x+y,0);
+  const pctChg=(cur,prev)=>{if(prev===0) return cur>0?100:0; return Math.round(((cur-prev)/prev)*100);};
+  const reviews=DB.reviews();
+  const avgRating=reviews.length?(reviews.reduce((s,r)=>s+(r.rating||5),0)/reviews.length).toFixed(1):'—';
+  const heroCards=[
+    {label:'Bookings (7d)',val:sum(last7Counts),chg:pctChg(sum(last7Counts),sum(prev7Counts)),spark:last7Counts,color:'#f97316',ic:'📋',tint:'rgba(249,115,22,.14)',click:"apanel('bookings',null)"},
+    {label:'Revenue (7d)',val:'₹'+sum(last7Rev).toLocaleString('en-IN'),chg:pctChg(sum(last7Rev),sum(prev7Rev)),spark:last7Rev,color:'#10b981',ic:'💰',tint:'rgba(16,185,129,.14)',click:"apanel('revenue',null)"},
+    {label:'New Customers (7d)',val:sum(last7NewCust),chg:pctChg(sum(last7NewCust),sum(prev7NewCust)),spark:last7NewCust,color:'#3b82f6',ic:'👥',tint:'rgba(59,130,246,.14)',click:"apanel('customers',null)"},
+    {label:'Avg Rating',val:avgRating+' ★',chg:null,spark:null,color:'#8b5cf6',ic:'⭐',tint:'rgba(139,92,246,.14)',click:"apanel('reviews',null)"},
+  ];
+  $('a-hero-stats').innerHTML=heroCards.map(c=>`<div class="hero-stat" style="--hs-tint:${c.tint};cursor:pointer;" onclick="${c.click}">
+    <div class="hero-stat-top">
+      <div class="hero-stat-ic" style="background:${c.tint};">${c.ic}</div>
+      ${c.chg!==null?`<span class="hero-stat-chg ${c.chg>=0?'up':'down'}">${c.chg>=0?'▲':'▼'} ${Math.abs(c.chg)}%</span>`:''}
+    </div>
+    <div class="hero-stat-n">${c.val}</div>
+    <div class="hero-stat-l">${c.label}</div>
+    ${c.spark?`<div class="hero-stat-spark">${svgSparkline(c.spark,c.color,100,30)}</div>`:''}
+  </div>`).join('');
+  // ── TREND CHART (last 14 days bookings + revenue) ──
+  const last14=[];for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);last14.push(d);}
+  const trendLabels=last14.map(d=>d.getDate()+'/'+(d.getMonth()+1));
+  const trendBookings=last14.map(d=>bksOnDay(iso(d)).length);
+  const trendRevMax=Math.max(...last14.map(d=>revOnDay(iso(d))),1);
+  const trendRevenueScaled=last14.map(d=>(revOnDay(iso(d))/trendRevMax)*Math.max(...trendBookings,1));
+  $('a-trend-chart').innerHTML=`
+    <div style="display:flex;gap:1.2rem;margin-bottom:.6rem;font-size:.74rem;">
+      <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#f97316;display:inline-block;"></span>Bookings</span>
+      <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#10b981;display:inline-block;"></span>Revenue (scaled)</span>
+    </div>
+    ${svgTrendChart([{name:'Bookings',color:'#f97316',data:trendBookings},{name:'Revenue',color:'#10b981',data:trendRevenueScaled}],trendLabels,760,210)}
+  `;
   const kd=[
-    {ic:'📋',n:bks.length,l:pl[curPeriod]+' Bookings',f:'all',p:curPeriod},
+    {ic:'📋',n:bks.length,l:({today:"Today's",yesterday:"Yesterday's",week:"This Week's",month:"This Month's",year:"This Year's",all:"All Time"})[curPeriod]+' Bookings',f:'all',p:curPeriod},
     {ic:'👥',n:us.length,l:'Total Customers',f:'customers',p:null},
     {ic:'⏳',n:bks.filter(b=>b.status==='pending').length,l:'Pending',f:'pending',p:curPeriod},
     {ic:'✅',n:bks.filter(b=>b.status==='confirmed').length,l:'Confirmed',f:'confirmed',p:curPeriod},
@@ -3412,28 +3551,33 @@ function renderAdminDash(){
       </div>
     </div>`;
   }).join('');
-  const sts=[['pending',bks.filter(b=>b.status==='pending').length,'var(--yl)','⏳'],['confirmed',bks.filter(b=>b.status==='confirmed').length,'var(--bl)','✅'],['inprogress',bks.filter(b=>b.status==='inprogress').length,'var(--acc)','🔧'],['completed',bks.filter(b=>b.status==='completed').length,'var(--gr)','🏆'],['cancelled',bks.filter(b=>b.status==='cancelled').length,'var(--rd)','❌']];
-  const stm=Math.max(...sts.map(s=>s[1]),1);
-  // Status pipeline / flowchart
-  $('a-st-bar').innerHTML=`<div style="padding:.8rem;">
-    <div style="display:flex;align-items:stretch;gap:0;margin-bottom:1.1rem;border-radius:10px;overflow:hidden;border:1px solid var(--bdr);">
-      ${sts.filter(s=>s[0]!=='cancelled').map(([st,c,col,ic],i,arr)=>`
-      <div style="flex:1;padding:.6rem .4rem;background:var(--s2);text-align:center;border-right:${i<arr.length-1?'1px solid var(--bdr)':'none'};">
-        <div style="font-size:1rem;">${ic}</div>
-        <div style="font-family:var(--fh);font-size:1.2rem;font-weight:900;color:${col};">${c}</div>
-        <div style="font-size:.62rem;color:var(--mu);text-transform:capitalize;">${st==='inprogress'?'Active':st}</div>
+  const sts=[['pending',bks.filter(b=>b.status==='pending').length,'#f59e0b','⏳'],['confirmed',bks.filter(b=>b.status==='confirmed').length,'#3b82f6','✅'],['inprogress',bks.filter(b=>b.status==='inprogress').length,'#f97316','🔧'],['completed',bks.filter(b=>b.status==='completed').length,'#10b981','🏆'],['cancelled',bks.filter(b=>b.status==='cancelled').length,'#ef4444','❌']];
+  // Donut + legend for Status Breakdown
+  $('a-st-bar').innerHTML=`<div style="display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap;">
+    <div style="flex-shrink:0;">${svgDonut(sts.map(([s,c,col])=>({label:s,value:c,color:col})),120)}</div>
+    <div style="flex:1;min-width:150px;">
+      ${sts.map(([s,c,col,ic])=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:.79rem;margin-bottom:.55rem;">
+        <span style="display:flex;align-items:center;gap:.45rem;text-transform:capitalize;"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;"></span>${ic} ${s==='inprogress'?'In Progress':s}</span>
+        <span style="font-weight:700;color:${col};">${c}</span>
       </div>`).join('')}
     </div>
-    ${sts.map(([s,c,col,ic])=>`<div style="margin-bottom:.75rem;">
-      <div style="display:flex;justify-content:space-between;font-size:.79rem;margin-bottom:.27rem;">
-        <span style="text-transform:capitalize;">${ic} ${s==='inprogress'?'In Progress':s}</span>
-        <span style="color:${col};font-weight:700;">${c}</span>
-      </div>
-      <div style="background:var(--s2);border-radius:4px;height:7px;overflow:hidden;">
-        <div style="height:100%;width:${Math.round(c/stm*100)}%;background:${col};border-radius:4px;transition:width .5s;"></div>
-      </div>
-    </div>`).join('')}
   </div>`;
+  // ── BOTTOM QUICK STATS ──
+  const empActiveCount=EMP_DB.list().filter(e=>e.status==='active').length;
+  const pendingReviewsCount=reviews.filter(r=>!r.approved&&!r.rejected).length;
+  const unreadContactsCount=DB.contacts().filter(c=>!c.read).length;
+  const totalRevAllTime=all.reduce((s,b)=>s+(b.grandTotal||b.totalAmount||0),0);
+  const qs=[
+    {ic:'👷',n:empActiveCount,l:'Active Employees',click:"apanel('employees',null)"},
+    {ic:'⭐',n:avgRating,l:'Avg Rating',click:"apanel('reviews',null)"},
+    {ic:'📝',n:pendingReviewsCount,l:'Pending Reviews',click:"apanel('reviews',null)"},
+    {ic:'✉️',n:unreadContactsCount,l:'Unread Messages',click:"apanel('contacts',null)"},
+  ];
+  $('a-quick-stats').innerHTML=qs.map(q=>`<div class="quick-stat" onclick="${q.click}">
+    <div class="quick-stat-ic">${q.ic}</div>
+    <div class="quick-stat-n">${q.n}</div>
+    <div class="quick-stat-l">${q.l}</div>
+  </div>`).join('');
   $('a-recent').innerHTML=bks.slice(0,6).map(adminRow).join('')||empBox('No bookings yet.');
   // Employee ticket counts
   const empTicketEl = $('a-emp-tickets');
