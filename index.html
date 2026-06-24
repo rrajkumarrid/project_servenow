@@ -23,6 +23,36 @@ function fmtDate(d){return new Date(d).toLocaleDateString('en-IN');}
 function v(id){return document.getElementById(id)?.value?.trim()||'';}
 function $(id){return document.getElementById(id);}
 function empBox(msg){return`<div class="empty-s"><div class="empty-ic">📭</div><p>${msg}</p></div>`;}
+function trackAnonVisit(){
+  if(CU||isAdmin||CUR_EMP) return;
+  try{
+    if(sessionStorage.getItem('sn_anon_counted')) return;
+    sessionStorage.setItem('sn_anon_counted','1');
+  }catch(e){return;}
+  const log=DB.g('anonVisits')||[];
+  log.push({day:iso(new Date()),ts:Date.now()});
+  DB.s('anonVisits',log.slice(-3000));
+}
+function animateCounters(root){
+  const els=(root||document).querySelectorAll('[data-cnt-target]');
+  els.forEach(el=>{
+    const end=parseFloat(el.getAttribute('data-cnt-target'))||0;
+    const prefix=el.getAttribute('data-cnt-prefix')||'';
+    const suffix=el.getAttribute('data-cnt-suffix')||'';
+    const decimals=el.getAttribute('data-cnt-decimals')==='1';
+    const duration=500;
+    const startTime=performance.now();
+    function step(now){
+      const progress=Math.min((now-startTime)/duration,1);
+      const eased=1-Math.pow(1-progress,3);
+      const cur=end*eased;
+      el.textContent=prefix+(decimals?cur.toFixed(1):Math.round(cur).toLocaleString('en-IN'))+suffix;
+      if(progress<1) requestAnimationFrame(step);
+      else el.textContent=prefix+(decimals?end.toFixed(1):end.toLocaleString('en-IN'))+suffix;
+    }
+    requestAnimationFrame(step);
+  });
+}
 function svgSparkline(data,color,w,h){
   w=w||72;h=h||30;
   if(!data||!data.length) return '';
@@ -531,7 +561,7 @@ function doAssignBk(bkId, empId) {
 function toggleEmpStatus(id) {
   const emp = EMP_DB.find(id); if (!emp) return;
   EMP_DB.up(id, { status: emp.status === 'active' ? 'inactive' : 'active' });
-  renderEmployees();
+  syncAdminViews();
   toast(emp.status === 'active' ? 'Employee deactivated.' : '✅ Employee activated!');
 }
 
@@ -600,7 +630,7 @@ function submitResetPwd(id, name) {
   } else {
     toast('✅ Password updated for ' + name + '. ⚠️ No email/phone on file to notify them.');
   }
-  renderEmployees();
+  syncAdminViews();
 }
 
 function openAddEmployeeModal() {
@@ -1244,8 +1274,9 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .kpi-l{font-size:.68rem;color:var(--mu);margin-top:.1rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;}
 
 /* ── HERO STAT CARDS (dashboard analytics row) ── */
-.hero-stat-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1rem;margin-bottom:1.4rem;}
-.hero-stat{border-radius:16px;padding:1.2rem 1.3rem;position:relative;overflow:hidden;border:1px solid var(--bdr);background:var(--s1);}
+.hero-stat-row{display:grid;grid-template-columns:repeat(5,1fr);gap:1.1rem;margin-bottom:1.4rem;}
+.hero-stat{border-radius:16px;padding:1.2rem 1.3rem;position:relative;overflow:hidden;border:1px solid var(--bdr);background:var(--s1);transition:transform .25s,box-shadow .25s,border-color .25s;}
+.hero-stat:hover{transform:translateY(-3px);border-color:rgba(249,115,22,.3);box-shadow:0 10px 28px rgba(0,0,0,.35);}
 .hero-stat::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,var(--hs-tint,rgba(249,115,22,.1)) 0%,transparent 70%);pointer-events:none;}
 .hero-stat-top{display:flex;justify-content:space-between;align-items:flex-start;position:relative;z-index:1;margin-bottom:.6rem;}
 .hero-stat-ic{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1rem;background:var(--hs-tint,rgba(249,115,22,.14));flex-shrink:0;}
@@ -1255,6 +1286,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .hero-stat-n{font-family:var(--fh);font-size:1.55rem;font-weight:900;position:relative;z-index:1;}
 .hero-stat-l{font-size:.7rem;color:var(--mu);font-weight:600;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.6rem;position:relative;z-index:1;}
 .hero-stat-spark{position:relative;z-index:1;}
+@media(max-width:1100px){.hero-stat-row{grid-template-columns:repeat(3,1fr);}}
 @media(max-width:900px){.hero-stat-row{grid-template-columns:repeat(2,1fr);}}
 @media(max-width:600px){.hero-stat-row{grid-template-columns:1fr;}}
 
@@ -1266,6 +1298,21 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .quick-stat-n{font-family:var(--fh);font-size:1.4rem;font-weight:900;color:var(--acc);}
 .quick-stat-l{font-size:.7rem;color:var(--mu);font-weight:600;margin-top:.15rem;}
 @media(max-width:900px){.quick-stat-row{grid-template-columns:repeat(2,1fr);}}
+
+/* ── DASHBOARD ENTRANCE ANIMATIONS ── */
+@keyframes fadeUpIn{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@keyframes chartFadeIn{from{opacity:0;transform:scale(.96);}to{opacity:1;transform:scale(1);}}
+.hero-stat,.quick-stat,.kpi{animation:fadeUpIn .5s cubic-bezier(.22,1,.36,1) both;}
+.hero-stat:nth-child(1),.quick-stat:nth-child(1),.kpi:nth-child(1){animation-delay:0s;}
+.hero-stat:nth-child(2),.quick-stat:nth-child(2),.kpi:nth-child(2){animation-delay:.06s;}
+.hero-stat:nth-child(3),.quick-stat:nth-child(3),.kpi:nth-child(3){animation-delay:.12s;}
+.hero-stat:nth-child(4),.quick-stat:nth-child(4),.kpi:nth-child(4){animation-delay:.18s;}
+.hero-stat:nth-child(5),.quick-stat:nth-child(5),.kpi:nth-child(5){animation-delay:.24s;}
+.hero-stat:nth-child(6),.quick-stat:nth-child(6),.kpi:nth-child(6){animation-delay:.3s;}
+.chart-fade{animation:chartFadeIn .55s cubic-bezier(.22,1,.36,1) both;animation-delay:.15s;}
+.hero-stat-spark svg polyline,.chart-fade svg polyline{stroke-dasharray:600;stroke-dashoffset:600;animation:drawLine 1s ease forwards;animation-delay:.25s;}
+@keyframes drawLine{to{stroke-dashoffset:0;}}
+.funnel-bar{height:26px;border-radius:6px;transition:width 1s cubic-bezier(.22,1,.36,1);}
 
 /* ── TABLE CARD ── */
 .tc{background:var(--s1);border:1px solid var(--bdr);border-radius:15px;overflow:hidden;margin-bottom:1.4rem;}
@@ -1912,8 +1959,8 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
           <div class="kpi-row" id="a-kpis" style="padding:1rem;margin:0;"></div>
         </div>
         <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:1.4rem;margin-bottom:1.4rem;" class="admin-charts-grid">
-          <div class="tc"><div class="tc-hdr"><h3>Bookings by Service</h3></div><div id="a-svc-bar" style="padding:1.15rem;"></div></div>
-          <div class="tc"><div class="tc-hdr"><h3>Status Breakdown</h3></div><div id="a-st-bar" style="padding:1.3rem;"></div></div>
+          <div class="tc"><div class="tc-hdr"><h3>Bookings by Service</h3></div><div id="a-svc-bar" class="chart-fade" style="padding:1.15rem;"></div></div>
+          <div class="tc"><div class="tc-hdr"><h3>Status Breakdown</h3></div><div id="a-st-bar" class="chart-fade" style="padding:1.3rem;"></div></div>
         </div>
         <div class="quick-stat-row" id="a-quick-stats"></div>
         <div class="tc"><div class="tc-hdr"><h3>Recent Bookings</h3></div><div id="a-recent"></div></div>
@@ -3435,6 +3482,22 @@ function loadAdmin(){
   if(mb){mb.style.display=pending>0?'block':'none';mb.textContent=pending;}
   apanel('dash',null);
 }
+function syncAdminViews(){
+  buildAdminNav();
+  renderGlobalAcctChip();
+  updateStats();
+  if($('ap-dash')?.classList.contains('on')) renderAdminDash();
+  if($('ap-bookings')?.classList.contains('on')) renderAdminBks();
+  if($('ap-customers')?.classList.contains('on')) renderAdminCusts();
+  if($('ap-employees')?.classList.contains('on')) renderEmployees();
+  if($('ap-revenue')?.classList.contains('on')) renderRevenueDash();
+  if($('ap-history')?.classList.contains('on')) renderDelHistory();
+  if($('ap-invreqs')?.classList.contains('on')) renderInvoiceReqs();
+  if($('ap-contacts')?.classList.contains('on')) renderAdminContacts();
+  if($('ap-reviews')?.classList.contains('on')) renderAdminReviews();
+  if($('ap-notifications')?.classList.contains('on')) renderAdminNotifs();
+  SVCS.forEach(s=>{if($('ap-svc-'+s.id)?.classList.contains('on')) renderSvcPanel(s.id,s.name);});
+}
 function apanel(n,el){
   document.querySelectorAll('#adminPg .dpanel').forEach(p=>p.classList.remove('on'));
   $('ap-'+n)?.classList.add('on');
@@ -3492,22 +3555,29 @@ function renderAdminDash(){
   const sum=a=>a.reduce((x,y)=>x+y,0);
   const pctChg=(cur,prev)=>{if(prev===0) return cur>0?100:0; return Math.round(((cur-prev)/prev)*100);};
   const reviews=DB.reviews();
-  const avgRating=reviews.length?(reviews.reduce((s,r)=>s+(r.rating||5),0)/reviews.length).toFixed(1):'—';
+  const avgRating=reviews.length?(reviews.reduce((s,r)=>s+(r.rating||5),0)/reviews.length).toFixed(1):0;
+  const anonCount=all.filter(b=>b.uemail==='guest@servenow.in').length;
+  const anonLog=DB.g('anonVisits')||[];
+  const anonVisitsOnDay=day=>anonLog.filter(v=>v.day===day).length;
+  const last7AnonVisits=last7.map(d=>anonVisitsOnDay(d));
+  const prev7AnonVisits=prev7.map(d=>anonVisitsOnDay(d));
   const heroCards=[
-    {label:'Bookings (7d)',val:sum(last7Counts),chg:pctChg(sum(last7Counts),sum(prev7Counts)),spark:last7Counts,color:'#f97316',ic:'📋',tint:'rgba(249,115,22,.14)',click:"apanel('bookings',null)"},
-    {label:'Revenue (7d)',val:'₹'+sum(last7Rev).toLocaleString('en-IN'),chg:pctChg(sum(last7Rev),sum(prev7Rev)),spark:last7Rev,color:'#10b981',ic:'💰',tint:'rgba(16,185,129,.14)',click:"apanel('revenue',null)"},
-    {label:'New Customers (7d)',val:sum(last7NewCust),chg:pctChg(sum(last7NewCust),sum(prev7NewCust)),spark:last7NewCust,color:'#3b82f6',ic:'👥',tint:'rgba(59,130,246,.14)',click:"apanel('customers',null)"},
-    {label:'Avg Rating',val:avgRating+' ★',chg:null,spark:null,color:'#8b5cf6',ic:'⭐',tint:'rgba(139,92,246,.14)',click:"apanel('reviews',null)"},
+    {label:'Bookings (7d)',val:sum(last7Counts),isMoney:false,chg:pctChg(sum(last7Counts),sum(prev7Counts)),spark:last7Counts,color:'#f97316',ic:'📋',tint:'rgba(249,115,22,.14)',click:"apanel('bookings',null)"},
+    {label:'Revenue (7d)',val:sum(last7Rev),isMoney:true,chg:pctChg(sum(last7Rev),sum(prev7Rev)),spark:last7Rev,color:'#10b981',ic:'💰',tint:'rgba(16,185,129,.14)',click:"apanel('revenue',null)"},
+    {label:'New Customers (7d)',val:sum(last7NewCust),isMoney:false,chg:pctChg(sum(last7NewCust),sum(prev7NewCust)),spark:last7NewCust,color:'#3b82f6',ic:'👥',tint:'rgba(59,130,246,.14)',click:"apanel('customers',null)"},
+    {label:'Anonymous Visitors (7d)',val:sum(last7AnonVisits),isMoney:false,suffix:' • '+anonCount+' booked as guest',chg:pctChg(sum(last7AnonVisits),sum(prev7AnonVisits)),spark:last7AnonVisits,color:'#ec4899',ic:'🕶️',tint:'rgba(236,72,153,.14)',click:null},
+    {label:'Avg Rating',val:parseFloat(avgRating),isMoney:false,decimals:true,suffix:' ★',chg:null,spark:null,color:'#8b5cf6',ic:'⭐',tint:'rgba(139,92,246,.14)',click:"apanel('reviews',null)"},
   ];
-  $('a-hero-stats').innerHTML=heroCards.map(c=>`<div class="hero-stat" style="--hs-tint:${c.tint};cursor:pointer;" onclick="${c.click}">
+  $('a-hero-stats').innerHTML=heroCards.map(c=>`<div class="hero-stat" style="--hs-tint:${c.tint};${c.click?'cursor:pointer;':''}" ${c.click?`onclick="${c.click}"`:''}>
     <div class="hero-stat-top">
       <div class="hero-stat-ic" style="background:${c.tint};">${c.ic}</div>
       ${c.chg!==null?`<span class="hero-stat-chg ${c.chg>=0?'up':'down'}">${c.chg>=0?'▲':'▼'} ${Math.abs(c.chg)}%</span>`:''}
     </div>
-    <div class="hero-stat-n">${c.val}</div>
+    <div class="hero-stat-n" data-cnt-target="${c.val}" data-cnt-prefix="${c.isMoney?'₹':''}" data-cnt-suffix="${c.suffix||''}" ${c.decimals?'data-cnt-decimals="1"':''}>0</div>
     <div class="hero-stat-l">${c.label}</div>
     ${c.spark?`<div class="hero-stat-spark">${svgSparkline(c.spark,c.color,100,30)}</div>`:''}
   </div>`).join('');
+  animateCounters($('a-hero-stats'));
   // ── TREND CHART (last 14 days bookings + revenue) ──
   const last14=[];for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);last14.push(d);}
   const trendLabels=last14.map(d=>d.getDate()+'/'+(d.getMonth()+1));
@@ -3519,7 +3589,7 @@ function renderAdminDash(){
       <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#f97316;display:inline-block;"></span>Bookings</span>
       <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#10b981;display:inline-block;"></span>Revenue (scaled)</span>
     </div>
-    ${svgTrendChart([{name:'Bookings',color:'#f97316',data:trendBookings},{name:'Revenue',color:'#10b981',data:trendRevenueScaled}],trendLabels,760,210)}
+    <div class="chart-fade">${svgTrendChart([{name:'Bookings',color:'#f97316',data:trendBookings},{name:'Revenue',color:'#10b981',data:trendRevenueScaled}],trendLabels,760,210)}</div>
   `;
   const kd=[
     {ic:'📋',n:bks.length,l:({today:"Today's",yesterday:"Yesterday's",week:"This Week's",month:"This Month's",year:"This Year's",all:"All Time"})[curPeriod]+' Bookings',f:'all',p:curPeriod},
@@ -3529,7 +3599,8 @@ function renderAdminDash(){
     {ic:'🔧',n:bks.filter(b=>b.status==='inprogress').length,l:'In Progress',f:'inprogress',p:curPeriod},
     {ic:'🏆',n:bks.filter(b=>b.status==='completed').length,l:'Completed',f:'completed',p:curPeriod},
   ];
-  $('a-kpis').innerHTML=kd.map(k=>`<div class="kpi" style="cursor:pointer;" onclick="dashKpiClick('${k.f}','${k.p||''}')"><div class="kpi-ic">${k.ic}</div><div class="kpi-n">${k.n}</div><div class="kpi-l">${k.l}</div><div style="font-size:.62rem;color:var(--acc);margin-top:.25rem;">Click to view →</div></div>`).join('');
+  $('a-kpis').innerHTML=kd.map(k=>`<div class="kpi" style="cursor:pointer;" onclick="dashKpiClick('${k.f}','${k.p||''}')"><div class="kpi-ic">${k.ic}</div><div class="kpi-n" data-cnt-target="${k.n}">0</div><div class="kpi-l">${k.l}</div><div style="font-size:.62rem;color:var(--acc);margin-top:.25rem;">Click to view →</div></div>`).join('');
+  animateCounters($('a-kpis'));
   const sm=Math.max(...SVCS.map(s=>all.filter(b=>b.svc===s.name).length),1);
   $('a-svc-bar').innerHTML=SVCS.map(s=>{
     const c=all.filter(b=>b.svc===s.name).length;
@@ -3552,16 +3623,36 @@ function renderAdminDash(){
     </div>`;
   }).join('');
   const sts=[['pending',bks.filter(b=>b.status==='pending').length,'#f59e0b','⏳'],['confirmed',bks.filter(b=>b.status==='confirmed').length,'#3b82f6','✅'],['inprogress',bks.filter(b=>b.status==='inprogress').length,'#f97316','🔧'],['completed',bks.filter(b=>b.status==='completed').length,'#10b981','🏆'],['cancelled',bks.filter(b=>b.status==='cancelled').length,'#ef4444','❌']];
+  // Funnel: how bookings progress from Pending → Confirmed → In Progress → Completed
+  const funnelStages=[['Pending',bks.filter(b=>['pending','confirmed','inprogress','completed'].includes(b.status)).length,'#f59e0b'],['Confirmed',bks.filter(b=>['confirmed','inprogress','completed'].includes(b.status)).length,'#3b82f6'],['In Progress',bks.filter(b=>['inprogress','completed'].includes(b.status)).length,'#f97316'],['Completed',bks.filter(b=>b.status==='completed').length,'#10b981']];
+  const funnelMax=Math.max(funnelStages[0][1],1);
   // Donut + legend for Status Breakdown
-  $('a-st-bar').innerHTML=`<div style="display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap;">
-    <div style="flex-shrink:0;">${svgDonut(sts.map(([s,c,col])=>({label:s,value:c,color:col})),120)}</div>
+  $('a-st-bar').innerHTML=`<div style="display:flex;align-items:center;gap:1.4rem;flex-wrap:wrap;margin-bottom:1.3rem;">
+    <div class="chart-fade" style="flex-shrink:0;">${svgDonut(sts.map(([s,c,col])=>({label:s,value:c,color:col})),120)}</div>
     <div style="flex:1;min-width:150px;">
-      ${sts.map(([s,c,col,ic])=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:.79rem;margin-bottom:.55rem;">
+      ${sts.map(([s,c,col,ic],idx)=>`<div style="display:flex;justify-content:space-between;align-items:center;font-size:.79rem;margin-bottom:.55rem;">
         <span style="display:flex;align-items:center;gap:.45rem;text-transform:capitalize;"><span style="width:9px;height:9px;border-radius:50%;background:${col};display:inline-block;"></span>${ic} ${s==='inprogress'?'In Progress':s}</span>
-        <span style="font-weight:700;color:${col};">${c}</span>
+        <span style="font-weight:700;color:${col};" data-cnt-target="${c}">0</span>
       </div>`).join('')}
     </div>
+  </div>
+  <div style="border-top:1px solid var(--bdr);padding-top:1.1rem;">
+    <div style="font-size:.74rem;color:var(--mu);font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.8rem;">Conversion Funnel</div>
+    ${funnelStages.map(([label,count,col],i)=>{
+      const pct=Math.round((count/funnelMax)*100);
+      return`<div style="margin-bottom:.65rem;">
+        <div style="display:flex;justify-content:space-between;font-size:.76rem;margin-bottom:.25rem;">
+          <span>${label}</span><span style="font-weight:700;color:${col};">${count}</span>
+        </div>
+        <div style="background:var(--s2);border-radius:6px;height:26px;overflow:hidden;">
+          <div class="funnel-bar" style="width:${pct}%;background:linear-gradient(90deg,${col},${col}cc);display:flex;align-items:center;justify-content:flex-end;padding-right:.5rem;">
+            ${pct>18?`<span style="font-size:.68rem;font-weight:700;color:#fff;">${pct}%</span>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
   </div>`;
+  animateCounters($('a-st-bar'));
   // ── BOTTOM QUICK STATS ──
   const empActiveCount=EMP_DB.list().filter(e=>e.status==='active').length;
   const pendingReviewsCount=reviews.filter(r=>!r.approved&&!r.rejected).length;
@@ -3575,9 +3666,10 @@ function renderAdminDash(){
   ];
   $('a-quick-stats').innerHTML=qs.map(q=>`<div class="quick-stat" onclick="${q.click}">
     <div class="quick-stat-ic">${q.ic}</div>
-    <div class="quick-stat-n">${q.n}</div>
+    <div class="quick-stat-n" data-cnt-target="${parseFloat(q.n)||0}" ${typeof q.n==='string'&&q.n.includes('.')?'data-cnt-decimals="1"':''}>0</div>
     <div class="quick-stat-l">${q.l}</div>
   </div>`).join('');
+  animateCounters($('a-quick-stats'));
   $('a-recent').innerHTML=bks.slice(0,6).map(adminRow).join('')||empBox('No bookings yet.');
   // Employee ticket counts
   const empTicketEl = $('a-emp-tickets');
@@ -3997,8 +4089,7 @@ function confirmComplete(bkId){
   document.body.style.overflow='';
   // Send notification
   sendNotification({type:'update',to:bk.uemail,phone:bk.uphone,name:bk.uname,bkId:bk.id,svc:bk.svc,sub:bk.sub,date:bk.date,time:bk.time,addr:bk.addr,status:'completed'});
-  renderAdminDash();renderAdminBks();buildAdminNav();
-  SVCS.forEach(s=>{if($('list-svc-'+s.id)&&$('ap-svc-'+s.id)?.classList.contains('on'))renderSvcPanel(s.id,s.name);});
+  syncAdminViews();
   toast('🏆 Booking completed!');
   setTimeout(()=>showSendInvoicePrompt(bkId),400);
 }
@@ -4284,7 +4375,7 @@ function submitResetCustPwd(email,name){
   sendNotification({type:'password-reset',to:u.email,phone:u.phone,name:u.fn,
     msg:`Hello ${u.fn}! 🔑\nYour ServeNow account password has been reset by the admin.\n\nNew Password: ${np}\n\nPlease log in and change it if you'd like. If you did not expect this, contact support@servenow.in immediately.`});
   toast('✅ Password updated for '+name+' — notified by email & SMS.');
-  renderAdminCusts();
+  syncAdminViews();
 }
 let pendingStatusUpdate={id:null,status:null};
 function aUpd(id,status){
@@ -4392,8 +4483,7 @@ function confirmReservation(){
     openWhatsApp(b.uphone,notifMsg);
   }
   closeReservModal();
-  renderAdminDash();renderAdminBks();buildAdminNav();
-  SVCS.forEach(s=>{if($('list-svc-'+s.id)&&$('ap-svc-'+s.id)?.classList.contains('on'))renderSvcPanel(s.id,s.name);});
+  syncAdminViews();
   toast(status==='confirmed'?'✅ Booking confirmed & customer notified!':status==='inprogress'?'🔧 Marked in progress!':status==='completed'?'🏆 Booking completed!':'❌ Booking cancelled.');
 }
 function aDel(id){
@@ -4443,7 +4533,7 @@ function confirmDelete(id){
   DB.delBk(id);
   var modal=document.getElementById('delModal');if(modal)modal.remove();
   document.body.style.overflow='';
-  renderAdminBks();renderAdminDash();buildAdminNav();updateStats();
+  syncAdminViews();
   toast('🗑️ Booking deleted — record saved in History.');
 }
 function renderDelHistory(){
@@ -4492,7 +4582,7 @@ function adminSendInvoiceReq(reqId){
   sendNotification({type:'invoice',to:bk.uemail,phone:bk.uphone,name:bk.uname,bkId:bk.id,svc:bk.svc,
     msg:`📄 Hello ${bk.uname}! Your requested invoice for booking ${bk.id} (${bk.svc} — ${bk.sub}) is ready.\n\nTotal: ₹${(bk.grandTotal||bk.totalAmount||0).toLocaleString('en-IN')}\nStatus: ${bk.status}\n\nThank you for choosing ServeNow! 🙏`});
   DB.upInvoiceReq(reqId,{status:'sent',sentOn:fmtDT(new Date())});
-  renderInvoiceReqs();
+  syncAdminViews();
   toast('✅ Invoice sent to '+bk.uname+' via email & SMS.');
 }
 
@@ -4597,8 +4687,7 @@ function confirmReopen(bkId){
   }
   var modal=document.getElementById('reopenModal');if(modal)modal.remove();
   document.body.style.overflow='';
-  renderAdminDash();renderAdminBks();buildAdminNav();
-  SVCS.forEach(function(s){if($('list-svc-'+s.id)&&$('ap-svc-'+s.id)&&$('ap-svc-'+s.id).classList.contains('on'))renderSvcPanel(s.id,s.name);});
+  syncAdminViews();
   toast('🔄 Booking '+bkId+' reopened for investigation!');
 }
 
@@ -4702,19 +4791,20 @@ function renderAdminContacts(){
 }
 function delContact(id){
   DB.s('contacts',DB.contacts().filter(c=>c.id!==id));
-  renderAdminContacts();buildAdminNav();toast('Message deleted.');
+  syncAdminViews();
+  toast('Message deleted.');
 }
 
 // Ratings & Reviews
 function toggleFeatureReview(id){
   const r=DB.reviews().find(x=>x.id===id);if(!r)return;
   DB.upReview(id,{featured:!r.featured,approved:true});
-  renderAdminReviews();renderHome();
+  renderHome();syncAdminViews();
   toast(r.featured?'Removed from home page.':'✅ Now showing on the home page!');
 }
 function delReview(id){
   DB.s('reviews',DB.reviews().filter(r=>r.id!==id));
-  renderAdminReviews();renderHome();toast('Review deleted.');
+  renderHome();syncAdminViews();toast('Review deleted.');
 }
 
 function renderAdminNotifs(){
@@ -5191,6 +5281,7 @@ updateStats();
 updateNavForUser();
 hideMobNavs();
 attachFieldClearers();
+trackAnonVisit();
 // Arrived via a QR code / shared tracking link — auto-open the tracker for that booking
 (function(){
   const trackId=new URLSearchParams(window.location.search).get('track');
@@ -5210,6 +5301,32 @@ attachFieldClearers();
 })();
 // Re-attach field clearers when DOM mutates (dynamic forms)
 new MutationObserver(()=>attachFieldClearers()).observe(document.body,{childList:true,subtree:true});
+
+// ── CROSS-TAB / CROSS-PAGE DATA SYNC ──
+// localStorage changes made in one tab (e.g. admin updates a booking) fire a 'storage'
+// event in every OTHER open tab of this site, so we re-render whatever's currently visible there.
+function syncCurrentView(){
+  if(isAdmin){
+    renderAdminDash();
+    buildAdminNav();
+    const activePanel=document.querySelector('#adminPg .dpanel.on');
+    if(activePanel&&activePanel.id!=='ap-dash') apanel(activePanel.id.replace('ap-',''),null);
+  } else if(CUR_EMP){
+    if(typeof updateEmpNotifBadge==='function') updateEmpNotifBadge();
+    const activePanel=document.querySelector('#empPg .dpanel.on');
+    if(activePanel) epanel(activePanel.id.replace('ep-',''),null);
+  } else if(CU){
+    updateNotifBadges();
+    const activePanel=document.querySelector('#custPg .dpanel.on');
+    if(activePanel) cpanel(activePanel.id.replace('cp-',''),null);
+  }
+  renderGlobalAcctChip();
+  updateStats();
+}
+window.addEventListener('storage',function(e){
+  if(!e.key||!e.key.startsWith('sn_')) return;
+  syncCurrentView();
+});
 </script>
 </body>
 </html>
