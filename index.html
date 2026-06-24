@@ -69,7 +69,7 @@ function svgSparkline(data,color,w,h){
     <circle cx="${lastX.toFixed(1)}" cy="${lastY.toFixed(1)}" r="2.6" fill="${color}"/>
   </svg>`;
 }
-function svgTrendChart(seriesArr,labels,w,h){
+function svgTrendChart(seriesArr,labels,w,h,tipData){
   w=w||760;h=h||220;
   const pad={l:6,r:6,t:16,b:22};
   const cw=w-pad.l-pad.r, ch=h-pad.t-pad.b;
@@ -93,9 +93,43 @@ function svgTrendChart(seriesArr,labels,w,h){
   }).join('');
   const showEvery=Math.max(1,Math.ceil(n/7));
   const xLabels=labels.map((l,i)=>i%showEvery===0?`<text x="${xFor(i).toFixed(1)}" y="${h-4}" font-size="9" fill="#8888a8" text-anchor="middle" font-family="Outfit,sans-serif">${l}</text>`:'').join('');
-  return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;overflow:visible;">
-    ${gridLines}${lines}${xLabels}
+  // Invisible hover hit-columns + vertical guide line, shown/hidden via JS tooltip
+  let hoverZones='';
+  if(tipData&&tipData.length===n){
+    const colW=n>1?cw/(n-1):cw;
+    hoverZones=labels.map((l,i)=>{
+      const cx=xFor(i);
+      const tip=tipData[i].replace(/"/g,'&quot;');
+      return `<rect x="${(cx-colW/2).toFixed(1)}" y="${pad.t}" width="${colW.toFixed(1)}" height="${ch.toFixed(1)}" fill="transparent"
+        onmouseenter="showTrendTip(event,'${tip}',${cx.toFixed(1)})" onmousemove="moveTrendTip(event)" onmouseleave="hideTrendTip()" style="cursor:crosshair;"/>`;
+    }).join('');
+  }
+  return `<svg width="100%" height="${h}" viewBox="0 0 ${w} ${h}" preserveAspectRatio="none" style="display:block;overflow:visible;" onmouseleave="hideTrendTip()">
+    ${gridLines}${lines}${xLabels}${hoverZones}
   </svg>`;
+}
+function showTrendTip(e,html,svgX){
+  let tip=document.getElementById('trendTooltip');
+  if(!tip){
+    tip=document.createElement('div');
+    tip.id='trendTooltip';
+    tip.style.cssText='position:fixed;z-index:9999;background:var(--s1);border:1px solid var(--bdr);border-radius:10px;padding:.6rem .8rem;font-size:.74rem;line-height:1.55;pointer-events:none;box-shadow:0 8px 24px rgba(0,0,0,.4);white-space:nowrap;transition:opacity .1s;color:var(--tx);';
+    document.body.appendChild(tip);
+  }
+  tip.innerHTML=html;
+  tip.style.opacity='1';
+  moveTrendTip(e);
+}
+function moveTrendTip(e){
+  const tip=document.getElementById('trendTooltip');
+  if(!tip) return;
+  const x=e.clientX, y=e.clientY;
+  tip.style.left=Math.min(x+14,window.innerWidth-180)+'px';
+  tip.style.top=(y-44)+'px';
+}
+function hideTrendTip(){
+  const tip=document.getElementById('trendTooltip');
+  if(tip) tip.style.opacity='0';
 }
 function svgDonut(segments,size){
   size=size||128;
@@ -3536,6 +3570,13 @@ function setPeriod(p,el){
   document.querySelectorAll('#ap-dash .ftab').forEach(t=>t.classList.remove('on'));if(el)el.classList.add('on');
   renderAdminDash();
 }
+function parseCreatedISO(dateStr){
+  if(!dateStr) return null;
+  const m=String(dateStr).match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if(!m) return null;
+  const dd=m[1].padStart(2,'0'),mm=m[2].padStart(2,'0'),yyyy=m[3];
+  return `${yyyy}-${mm}-${dd}`;
+}
 function renderAdminDash(){
   const all=DB.bks();const bks=filterByPeriod(all,curPeriod);const us=DB.users();
   // ── HERO STAT CARDS (last 7 vs previous 7 days) ──
@@ -3544,14 +3585,16 @@ function renderAdminDash(){
   const last7=[],prev7=[];
   for(let i=6;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);last7.push(dayKey(d));}
   for(let i=13;i>=7;i--){const d=new Date(today);d.setDate(d.getDate()-i);prev7.push(dayKey(d));}
-  const bksOnDay=day=>all.filter(b=>(b.created||'').slice(0,10)===day || b.date===day);
+  // Bucketed strictly by actual creation timestamp — NOT the customer's chosen (often future) service date.
+  // Using service date here previously caused future-dated bookings to show up as phantom spikes on the wrong day.
+  const bksOnDay=day=>all.filter(b=>parseCreatedISO(b.created)===day);
   const revOnDay=day=>bksOnDay(day).reduce((s,b)=>s+(b.grandTotal||b.totalAmount||0),0);
   const last7Counts=last7.map(d=>bksOnDay(d).length);
   const prev7Counts=prev7.map(d=>bksOnDay(d).length);
   const last7Rev=last7.map(d=>revOnDay(d));
   const prev7Rev=prev7.map(d=>revOnDay(d));
-  const last7NewCust=last7.map(d=>us.filter(u=>(u.created||u.joinedOn||'').slice(0,10)===d).length);
-  const prev7NewCust=prev7.map(d=>us.filter(u=>(u.created||u.joinedOn||'').slice(0,10)===d).length);
+  const last7NewCust=last7.map(d=>us.filter(u=>parseCreatedISO(u.joined)===d).length);
+  const prev7NewCust=prev7.map(d=>us.filter(u=>parseCreatedISO(u.joined)===d).length);
   const sum=a=>a.reduce((x,y)=>x+y,0);
   const pctChg=(cur,prev)=>{if(prev===0) return cur>0?100:0; return Math.round(((cur-prev)/prev)*100);};
   const reviews=DB.reviews();
@@ -3565,7 +3608,7 @@ function renderAdminDash(){
     {label:'Bookings (7d)',val:sum(last7Counts),isMoney:false,chg:pctChg(sum(last7Counts),sum(prev7Counts)),spark:last7Counts,color:'#f97316',ic:'📋',tint:'rgba(249,115,22,.14)',click:"apanel('bookings',null)"},
     {label:'Revenue (7d)',val:sum(last7Rev),isMoney:true,chg:pctChg(sum(last7Rev),sum(prev7Rev)),spark:last7Rev,color:'#10b981',ic:'💰',tint:'rgba(16,185,129,.14)',click:"apanel('revenue',null)"},
     {label:'New Customers (7d)',val:sum(last7NewCust),isMoney:false,chg:pctChg(sum(last7NewCust),sum(prev7NewCust)),spark:last7NewCust,color:'#3b82f6',ic:'👥',tint:'rgba(59,130,246,.14)',click:"apanel('customers',null)"},
-    {label:'Anonymous Visitors (7d)',val:sum(last7AnonVisits),isMoney:false,suffix:' • '+anonCount+' booked as guest',chg:pctChg(sum(last7AnonVisits),sum(prev7AnonVisits)),spark:last7AnonVisits,color:'#ec4899',ic:'🕶️',tint:'rgba(236,72,153,.14)',click:null},
+    {label:'Anonymous Visitors (7d)',val:sum(last7AnonVisits),isMoney:false,extra:'👤 '+anonCount+' booked as guest (all time)',chg:pctChg(sum(last7AnonVisits),sum(prev7AnonVisits)),spark:last7AnonVisits,color:'#ec4899',ic:'🕶️',tint:'rgba(236,72,153,.14)',click:null},
     {label:'Avg Rating',val:parseFloat(avgRating),isMoney:false,decimals:true,suffix:' ★',chg:null,spark:null,color:'#8b5cf6',ic:'⭐',tint:'rgba(139,92,246,.14)',click:"apanel('reviews',null)"},
   ];
   $('a-hero-stats').innerHTML=heroCards.map(c=>`<div class="hero-stat" style="--hs-tint:${c.tint};${c.click?'cursor:pointer;':''}" ${c.click?`onclick="${c.click}"`:''}>
@@ -3575,6 +3618,7 @@ function renderAdminDash(){
     </div>
     <div class="hero-stat-n" data-cnt-target="${c.val}" data-cnt-prefix="${c.isMoney?'₹':''}" data-cnt-suffix="${c.suffix||''}" ${c.decimals?'data-cnt-decimals="1"':''}>0</div>
     <div class="hero-stat-l">${c.label}</div>
+    ${c.extra?`<div style="font-size:.66rem;color:${c.color};background:${c.tint};display:inline-block;padding:.18rem .5rem;border-radius:6px;margin-bottom:.5rem;font-weight:600;">${c.extra}</div>`:''}
     ${c.spark?`<div class="hero-stat-spark">${svgSparkline(c.spark,c.color,100,30)}</div>`:''}
   </div>`).join('');
   animateCounters($('a-hero-stats'));
@@ -3582,14 +3626,17 @@ function renderAdminDash(){
   const last14=[];for(let i=13;i>=0;i--){const d=new Date(today);d.setDate(d.getDate()-i);last14.push(d);}
   const trendLabels=last14.map(d=>d.getDate()+'/'+(d.getMonth()+1));
   const trendBookings=last14.map(d=>bksOnDay(iso(d)).length);
-  const trendRevMax=Math.max(...last14.map(d=>revOnDay(iso(d))),1);
+  const trendRealRev=last14.map(d=>revOnDay(iso(d)));
+  const trendRevMax=Math.max(...trendRealRev,1);
   const trendRevenueScaled=last14.map(d=>(revOnDay(iso(d))/trendRevMax)*Math.max(...trendBookings,1));
+  const fullDateLabels=last14.map(d=>d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}));
+  const trendTips=last14.map((d,i)=>`<strong>${fullDateLabels[i]}</strong><br>📋 ${trendBookings[i]} booking${trendBookings[i]!==1?'s':''}<br>💰 ₹${trendRealRev[i].toLocaleString('en-IN')} revenue`);
   $('a-trend-chart').innerHTML=`
     <div style="display:flex;gap:1.2rem;margin-bottom:.6rem;font-size:.74rem;">
       <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#f97316;display:inline-block;"></span>Bookings</span>
-      <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#10b981;display:inline-block;"></span>Revenue (scaled)</span>
+      <span style="display:flex;align-items:center;gap:.35rem;"><span style="width:9px;height:9px;border-radius:50%;background:#10b981;display:inline-block;"></span>Revenue (scaled — hover for actual ₹)</span>
     </div>
-    <div class="chart-fade">${svgTrendChart([{name:'Bookings',color:'#f97316',data:trendBookings},{name:'Revenue',color:'#10b981',data:trendRevenueScaled}],trendLabels,760,210)}</div>
+    <div class="chart-fade">${svgTrendChart([{name:'Bookings',color:'#f97316',data:trendBookings},{name:'Revenue',color:'#10b981',data:trendRevenueScaled}],trendLabels,760,210,trendTips)}</div>
   `;
   const kd=[
     {ic:'📋',n:bks.length,l:({today:"Today's",yesterday:"Yesterday's",week:"This Week's",month:"This Month's",year:"This Year's",all:"All Time"})[curPeriod]+' Bookings',f:'all',p:curPeriod},
