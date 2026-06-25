@@ -25,13 +25,28 @@ function $(id){return document.getElementById(id);}
 function empBox(msg){return`<div class="empty-s"><div class="empty-ic">📭</div><p>${msg}</p></div>`;}
 function trackAnonVisit(){
   if(CU||isAdmin||CUR_EMP) return;
+  let token;
   try{
     if(sessionStorage.getItem('sn_anon_counted')) return;
-    sessionStorage.setItem('sn_anon_counted','1');
+    token='av'+Date.now()+Math.random().toString(36).slice(2,8);
+    sessionStorage.setItem('sn_anon_counted',token);
   }catch(e){return;}
   const log=DB.g('anonVisits')||[];
-  log.push({day:iso(new Date()),ts:Date.now()});
+  log.push({day:iso(new Date()),ts:Date.now(),token});
   DB.s('anonVisits',log.slice(-3000));
+}
+function retractAnonVisitIfAny(){
+  // Called right after any successful login/registration — if this browser session was
+  // already counted as an "anonymous visitor" before logging in, undo that count, since
+  // they're a real admin/employee/registered user, not an anonymous one.
+  try{
+    const token=sessionStorage.getItem('sn_anon_counted');
+    if(!token) return;
+    const log=DB.g('anonVisits')||[];
+    const filtered=log.filter(v=>v.token!==token);
+    if(filtered.length!==log.length) DB.s('anonVisits',filtered);
+    sessionStorage.removeItem('sn_anon_counted');
+  }catch(e){}
 }
 function animateCounters(root){
   const els=(root||document).querySelectorAll('[data-cnt-target]');
@@ -200,6 +215,7 @@ function doEmployeeLogin() {
   if (!emp || emp.pass !== pw) return toast('Invalid credentials.', 'err');
   if (emp.status !== 'active') return toast('Your account is inactive. Contact admin.', 'err');
   CUR_EMP = emp;
+  retractAnonVisitIfAny();
   toast('✅ Welcome, ' + emp.name + '!');
   setTimeout(() => loadEmployeeDash(emp), 600);
 }
@@ -364,8 +380,13 @@ function getSubCatalogPrice(svc, sub) {
   if (!s) return null;
   const subObj = s.subs.find(x => x.name === sub);
   if (!subObj) return null;
-  const raw = String(subObj.price).replace(/[^\d]/g, '');
-  return raw ? parseInt(raw) : null;
+  // Extract only the FIRST number in the price string (e.g. "₹1,999 (2BHK)" -> 1999, not 19992).
+  // Previously this stripped every digit in the whole string, accidentally absorbing digits
+  // from "(2BHK)", "/month", etc. into the price itself.
+  const match = String(subObj.price).match(/[\d,]+(\.\d+)?/);
+  if (!match) return null;
+  const raw = match[0].replace(/,/g, '');
+  return raw ? parseFloat(raw) : null;
 }
 
 function openEmpCloseModal(bkId) {
@@ -2812,6 +2833,7 @@ function doRegister(){
   if(DB.has(em)) return toast('Email already registered.','err');
   const now=fmtDT(new Date());
   DB.addUser({id:'U'+Date.now(),fn,ln,email:em,phone:ph,pass:pw,addr:'',joined:now,lastModified:now,loginCount:1,lastLogin:now});
+  retractAnonVisitIfAny();
   sendNotification({type:'registration',to:em,phone:ph,name:fn+' '+ln,msg:`Welcome to ServeNow, ${fn}! Your account is active. 📱 Book services at Ariyalur & Perambalur.`});
   toast('✅ Account created! Welcome!');
   setTimeout(()=>loadCust(DB.findUser(em,pw)),700);
@@ -2822,11 +2844,13 @@ function doLogin(){
   const u=DB.findUser(em,pw);
   if(!u) return toast('Incorrect email or password.','err');
   DB.upUser(em,{loginCount:(u.loginCount||0)+1,lastLogin:fmtDT(new Date())});
+  retractAnonVisitIfAny();
   toast('✅ Welcome back, '+u.fn+'!');
   setTimeout(()=>loadCust(DB.users().find(x=>x.email===em)),600);
 }
 function doAdminLogin(){
   if(v('ad-em')==='admin@servenow.in'&&v('ad-pw')==='admin123'){
+    retractAnonVisitIfAny();
     isAdmin=true;toast('✅ Welcome, Admin!');setTimeout(loadAdmin,600);
   } else toast('Invalid admin credentials.','err');
 }
