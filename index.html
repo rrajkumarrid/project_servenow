@@ -23,6 +23,35 @@ function fmtDate(d){return new Date(d).toLocaleDateString('en-IN');}
 function v(id){return document.getElementById(id)?.value?.trim()||'';}
 function $(id){return document.getElementById(id);}
 function empBox(msg){return`<div class="empty-s"><div class="empty-ic">📭</div><p>${msg}</p></div>`;}
+function saveSession(type,key){
+  try{ localStorage.setItem('sn_session', JSON.stringify({type,key,ts:Date.now()})); }catch(e){}
+}
+function clearSession(){
+  try{ localStorage.removeItem('sn_session'); }catch(e){}
+}
+function restoreSession(){
+  try{
+    const raw=localStorage.getItem('sn_session');
+    if(!raw) return false;
+    const s=JSON.parse(raw);
+    if(!s||!s.type) return false;
+    if(s.type==='admin'){
+      isAdmin=true;CU=null;CUR_EMP=null;
+      loadAdmin();
+      return true;
+    }
+    if(s.type==='customer'){
+      const u=DB.users().find(x=>x.email===s.key);
+      if(u){ isAdmin=false;CUR_EMP=null; loadCust(u); return true; }
+    }
+    if(s.type==='employee'){
+      const emp=EMP_DB.find(s.key);
+      if(emp&&emp.status==='active'){ isAdmin=false;CU=null; loadEmployeeDash(emp); return true; }
+    }
+  }catch(e){}
+  clearSession();
+  return false;
+}
 function trackAnonVisit(){
   if(CU||isAdmin||CUR_EMP) return;
   let token;
@@ -216,6 +245,7 @@ function doEmployeeLogin() {
   if (emp.status !== 'active') return toast('Your account is inactive. Contact admin.', 'err');
   CUR_EMP = emp;
   retractAnonVisitIfAny();
+  saveSession('employee',emp.id);
   toast('✅ Welcome, ' + emp.name + '!');
   setTimeout(() => loadEmployeeDash(emp), 600);
 }
@@ -2449,15 +2479,9 @@ const ARIYALUR_CENTER=[11.14,79.08];
 let leafletMaps={};
 let userGPSLocation=null; // cache user's real location
 
-// Try to get user location on page load (silent, no toast)
-function prefetchGPS(){
-  if(!navigator.geolocation) return;
-  navigator.geolocation.getCurrentPosition(function(pos){
-    userGPSLocation=[pos.coords.latitude,pos.coords.longitude];
-  },function(){},
-  {enableHighAccuracy:true,timeout:8000,maximumAge:30000});
-}
-prefetchGPS();
+// Location is fetched on-demand only (inside createLeafletMap, when a booking map is actually
+// opened) — NOT eagerly here. Asking for GPS permission on every page load/refresh, before the
+// person has shown any intent to use location, is exactly why the browser kept re-prompting.
 
 function createLeafletMap(divId,onLocationSelect,jumpToGPS){
   const el=document.getElementById(divId);
@@ -2834,6 +2858,7 @@ function doRegister(){
   const now=fmtDT(new Date());
   DB.addUser({id:'U'+Date.now(),fn,ln,email:em,phone:ph,pass:pw,addr:'',joined:now,lastModified:now,loginCount:1,lastLogin:now});
   retractAnonVisitIfAny();
+  saveSession('customer',em);
   sendNotification({type:'registration',to:em,phone:ph,name:fn+' '+ln,msg:`Welcome to ServeNow, ${fn}! Your account is active. 📱 Book services at Ariyalur & Perambalur.`});
   toast('✅ Account created! Welcome!');
   setTimeout(()=>loadCust(DB.findUser(em,pw)),700);
@@ -2845,16 +2870,18 @@ function doLogin(){
   if(!u) return toast('Incorrect email or password.','err');
   DB.upUser(em,{loginCount:(u.loginCount||0)+1,lastLogin:fmtDT(new Date())});
   retractAnonVisitIfAny();
+  saveSession('customer',em);
   toast('✅ Welcome back, '+u.fn+'!');
   setTimeout(()=>loadCust(DB.users().find(x=>x.email===em)),600);
 }
 function doAdminLogin(){
   if(v('ad-em')==='admin@servenow.in'&&v('ad-pw')==='admin123'){
     retractAnonVisitIfAny();
+    saveSession('admin','admin');
     isAdmin=true;toast('✅ Welcome, Admin!');setTimeout(loadAdmin,600);
   } else toast('Invalid admin credentials.','err');
 }
-function doLogout(){CU=null;isAdmin=false;updateNavForUser();hideMobNavs();goHome();toast('Signed out.');}
+function doLogout(){CU=null;isAdmin=false;clearSession();updateNavForUser();hideMobNavs();goHome();toast('Signed out.');}
 
 // ══════════════════════════════════════
 // ACCOUNT RECOVERY — Forgot Username / Password
@@ -3453,6 +3480,7 @@ function savePrf(){
     DB.upUser(CU.email,{fn:nms[0],ln:nms.slice(1).join(' '),phone:ph,addr:ad});
   }
   CU={...CU,email:newEm,fn:nms[0],ln:nms.slice(1).join(' '),phone:ph,addr:ad};
+  if(newEm!==oldEm) saveSession('customer',newEm);
   $('c-nm2').textContent=CU.fn+' '+CU.ln;
   renderGlobalAcctChip();
   toast('✅ Profile saved!'+(newEm!==oldEm?' Email updated — notifications will go to your new address.':''));
@@ -5352,19 +5380,22 @@ updateStats();
 updateNavForUser();
 hideMobNavs();
 attachFieldClearers();
-trackAnonVisit();
-// Arrived via a QR code / shared tracking link — auto-open the tracker for that booking
-(function(){
-  const trackId=new URLSearchParams(window.location.search).get('track');
-  if(trackId){
-    setTimeout(()=>{
-      showPublicTracker();
-      const input=document.getElementById('pub-track-in');
-      if(input){input.value=trackId;}
-      doPubTrack();
-    },300);
-  }
-})();
+const _sessionWasRestored=restoreSession();
+if(!_sessionWasRestored){
+  trackAnonVisit();
+  // Arrived via a QR code / shared tracking link — auto-open the tracker for that booking
+  (function(){
+    const trackId=new URLSearchParams(window.location.search).get('track');
+    if(trackId){
+      setTimeout(()=>{
+        showPublicTracker();
+        const input=document.getElementById('pub-track-in');
+        if(input){input.value=trackId;}
+        doPubTrack();
+      },300);
+    }
+  })();
+}
 // How-it-works scroll animation
 (function(){
   const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');}),{threshold:.15});
