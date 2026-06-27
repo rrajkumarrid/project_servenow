@@ -29,29 +29,70 @@ function saveSession(type,key){
 function clearSession(){
   try{ localStorage.removeItem('sn_session'); }catch(e){}
 }
-function restoreSession(){
+function restoreSessionState(){
+  // Restores WHO is logged in (CU/isAdmin/CUR_EMP) without forcing any page navigation,
+  // so a hash-based route (e.g. a service page) can still take priority on refresh.
   try{
     const raw=localStorage.getItem('sn_session');
-    if(!raw) return false;
+    if(!raw) return null;
     const s=JSON.parse(raw);
-    if(!s||!s.type) return false;
-    if(s.type==='admin'){
-      isAdmin=true;CU=null;CUR_EMP=null;
-      loadAdmin();
-      return true;
-    }
+    if(!s||!s.type) return null;
+    if(s.type==='admin'){ isAdmin=true;CU=null;CUR_EMP=null; return 'admin'; }
     if(s.type==='customer'){
       const u=DB.users().find(x=>x.email===s.key);
-      if(u){ isAdmin=false;CUR_EMP=null; loadCust(u); return true; }
+      if(u){ CU=u;isAdmin=false;CUR_EMP=null; return 'customer'; }
     }
     if(s.type==='employee'){
       const emp=EMP_DB.find(s.key);
-      if(emp&&emp.status==='active'){ isAdmin=false;CU=null; loadEmployeeDash(emp); return true; }
+      if(emp&&emp.status==='active'){ CUR_EMP=emp;isAdmin=false;CU=null; return 'employee'; }
     }
   }catch(e){}
   clearSession();
+  return null;
+}
+function navigateToDashboard(type){
+  if(type==='admin') loadAdmin();
+  else if(type==='customer') loadCust(CU);
+  else if(type==='employee') loadEmployeeDash(CUR_EMP);
+}
+function routeFromHash(){
+  const hash=window.location.hash.replace('#','');
+  if(!hash) return false;
+  if(hash.indexOf('svc-')===0){
+    const id=hash.slice(4);
+    const s=SVCS.find(x=>x.id===id);
+    if(s){ curSvc=s;selSub=null;selCar=null;selSands=[]; buildSvcPage();pg('svcPg');updateNavForUser(); return true; }
+  }
+  if(hash.indexOf('page-')===0){
+    const page=hash.slice(5);
+    if(page==='about'||page==='privacy'||page==='terms'){
+      pg('innerPg');updateNavForUser();
+      const el=$('innerContent');
+      if(page==='about')el.innerHTML=buildAbout();
+      else if(page==='privacy')el.innerHTML=buildPrivacy();
+      else if(page==='terms')el.innerHTML=buildTerms();
+      return true;
+    }
+  }
   return false;
 }
+window.addEventListener('popstate',function(){
+  const routed=routeFromHash();
+  if(!routed) goHome();
+});
+// ── AUTO-LOGOUT AFTER 15 MINUTES OF INACTIVITY ──
+let _lastActivityTs=Date.now();
+const IDLE_LIMIT_MS=15*60*1000;
+['mousemove','mousedown','keydown','touchstart','scroll'].forEach(evt=>{
+  document.addEventListener(evt,()=>{_lastActivityTs=Date.now();},{passive:true});
+});
+function checkIdleLogout(){
+  if((CU||isAdmin||CUR_EMP)&&Date.now()-_lastActivityTs>IDLE_LIMIT_MS){
+    doLogout();
+    toast('You were signed out after 15 minutes of inactivity.','err');
+  }
+}
+setInterval(checkIdleLogout,30000);
 function trackAnonVisit(){
   if(CU||isAdmin||CUR_EMP) return;
   let token;
@@ -2743,7 +2784,7 @@ function pg(id){
   el.classList.add('on');
   window.scrollTo(0,0);
 }
-function goHome(){pg('homePg');updateStats();}
+function goHome(){pg('homePg');updateStats();if(window.location.hash)history.pushState(null,'','#');}
 function showAuth(t='login'){pg('authPg');atab(t);}
 function scrollS(id){
   if(!$('homePg').classList.contains('on')){pg('homePg');}
@@ -3030,6 +3071,7 @@ function initHowAnim(){
 function openSvcPage(id){
   curSvc=SVCS.find(s=>s.id===id);selSub=null;selCar=null;selSands=[];
   buildSvcPage();pg('svcPg');updateNavForUser();
+  if(window.location.hash!=='#svc-'+id) history.pushState(null,'','#svc-'+id);
 }
 
 function buildSvcPage(){
@@ -4971,6 +5013,7 @@ function goInner(page){
   if(page==='about')el.innerHTML=buildAbout();
   else if(page==='privacy')el.innerHTML=buildPrivacy();
   else if(page==='terms')el.innerHTML=buildTerms();
+  if(window.location.hash!=='#page-'+page) history.pushState(null,'','#page-'+page);
 }
 function buildAbout(){return`<div class="inner-pg"><div class="back-btn" onclick="goHome()">← Back</div><div class="stag">✦ About Us</div><h1>About ServeNow</h1><p class="lead">ServeNow is Ariyalur and Perambalur's first all-in-one home services platform — bringing verified professionals to your doorstep in minutes.</p><div class="inner-sec"><h2>Our Mission</h2><p>We started ServeNow to make reliable home services accessible to every household in Ariyalur and Perambalur districts. Finding a trustworthy electrician, AC technician, or contractor used to mean making dozens of calls. We changed that.</p><p>Today, ServeNow connects hundreds of households with trained, verified, and rated service professionals — all bookable in under 2 minutes, all trackable in real time.</p><h2>Our Values</h2><div class="val-grid"><div class="val-card"><div class="val-ic">🤝</div><div class="val-nm">Trust</div><div class="val-desc">Every professional is background-verified and rated by real customers.</div></div><div class="val-card"><div class="val-ic">⚡</div><div class="val-nm">Speed</div><div class="val-desc">Most services confirmed within 1 hour. Same-day availability.</div></div><div class="val-card"><div class="val-ic">💰</div><div class="val-nm">Transparency</div><div class="val-desc">All prices shown upfront. No hidden charges.</div></div><div class="val-card"><div class="val-ic">🌱</div><div class="val-nm">Local First</div><div class="val-desc">We prioritise local professionals from Ariyalur and Perambalur.</div></div></div><h2>Services</h2><ul><li><strong>AC Service</strong> — Repair, installation, gas filling, deep cleaning and AMC.</li><li><strong>Construction</strong> — Home building, renovation, flooring, painting, waterproofing and interior design.</li><li><strong>Cab Service</strong> — City rides, airport transfers, outstation trips and hourly rentals.</li><li><strong>Electrical</strong> — Wiring, fan/light installation, MCB panels, CCTV and home automation.</li><li><strong>Sand Supply</strong> — M-Sand, River Sand, P-Sand, Jelly, Red Soil and Quarry Dust.</li><li><strong>Home Cleaning</strong> — Deep cleaning, sofa cleaning, post-construction cleanup and maid service.</li></ul><h2>The Team</h2><div class="team-grid"><div class="team-card"><div class="team-av">RR</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Rajkumar R.</div><div style="color:var(--mu);font-size:.78rem;">Founder &amp; CEO</div></div><div class="team-card"><div class="team-av">KR</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Karthik R.</div><div style="color:var(--mu);font-size:.78rem;">Operations Head</div></div><div class="team-card"><div class="team-av">KA</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Kavitha A.</div><div style="color:var(--mu);font-size:.78rem;">Customer Relations</div></div><div class="team-card"><div class="team-av">RB</div><div style="font-family:var(--fh);font-weight:700;font-size:.95rem;">Rajesh B.</div><div style="color:var(--mu);font-size:.78rem;">Tech Lead</div></div></div><h2>Contact</h2><p>📍 Head Office: Ariyalur, Tamil Nadu 621704</p><p>📍 Branch: Perambalur, Tamil Nadu 621212</p><p>📞 +91 94XXX XXXXX &nbsp;|&nbsp; 📧 support@servenow.in</p><p>🕐 Mon–Sat: 7 AM – 9 PM</p></div></div>`;}
 function buildPrivacy(){return`<div class="inner-pg"><div class="back-btn" onclick="goHome()">← Back</div><div class="stag">✦ Privacy Policy</div><h1>Privacy Policy</h1><p class="lead">ServeNow is committed to protecting your privacy. This policy explains how we collect, use and safeguard your personal information.</p><div class="inner-sec"><p><em>Last updated: June 2026</em></p><h2>1. Information We Collect</h2><h3>Account Information</h3><p>Name, email, phone number and password when you register.</p><h3>Booking Information</h3><p>Service address, landmark, date, time and additional notes. For cab bookings, pickup and drop locations.</p><h3>Location Data</h3><p>With your explicit permission via GPS button. Never tracked in the background.</p><h2>2. How We Use Your Information</h2><ul><li>To create and manage your account</li><li>To process and confirm service bookings</li><li>To dispatch verified professionals to your location</li><li>To send WhatsApp, SMS and email confirmations and updates</li><li>To improve our services</li><li>To respond to support requests</li></ul><h2>3. WhatsApp & SMS Notifications</h2><p>By providing your phone number, you consent to receiving WhatsApp messages and SMS notifications for booking confirmations, status updates and promotional offers from ServeNow. You can opt out at any time by contacting support@servenow.in.</p><h2>4. Data Sharing</h2><p>We share your booking details with the assigned professional. We do not sell or rent your data. Trusted partners assisting platform operations operate under strict confidentiality.</p><h2>5. Your Rights</h2><ul><li>Access and correct your data in the Profile section</li><li>Request account deletion via support@servenow.in</li><li>Opt out of promotional communications</li></ul><h2>6. Contact</h2><p>privacy@servenow.in | Ariyalur, Tamil Nadu 621704</p></div></div>`;}
@@ -5380,21 +5423,30 @@ updateStats();
 updateNavForUser();
 hideMobNavs();
 attachFieldClearers();
-const _sessionWasRestored=restoreSession();
-if(!_sessionWasRestored){
+const _restoredRole=restoreSessionState();
+const _routed=routeFromHash();
+if(_restoredRole){
+  updateNavForUser();
+  if(!_routed) navigateToDashboard(_restoredRole);
+  // else: a specific page (e.g. a service page) was requested via the URL — show that
+  // instead of forcing the dashboard, while still being logged in in the background.
+}
+if(!_restoredRole){
   trackAnonVisit();
   // Arrived via a QR code / shared tracking link — auto-open the tracker for that booking
-  (function(){
-    const trackId=new URLSearchParams(window.location.search).get('track');
-    if(trackId){
-      setTimeout(()=>{
-        showPublicTracker();
-        const input=document.getElementById('pub-track-in');
-        if(input){input.value=trackId;}
-        doPubTrack();
-      },300);
-    }
-  })();
+  if(!_routed){
+    (function(){
+      const trackId=new URLSearchParams(window.location.search).get('track');
+      if(trackId){
+        setTimeout(()=>{
+          showPublicTracker();
+          const input=document.getElementById('pub-track-in');
+          if(input){input.value=trackId;}
+          doPubTrack();
+        },300);
+      }
+    })();
+  }
 }
 // How-it-works scroll animation
 (function(){
