@@ -1178,15 +1178,15 @@ input[type=date]::-webkit-calendar-picker-indicator,input[type=time]::-webkit-ca
 .svc-card{
   background:rgba(18,18,30,.7);
   border:1px solid rgba(255,255,255,.07);
-  border-radius:20px;padding:1.6rem;cursor:pointer;transition:.3s;position:relative;overflow:hidden;
+  border-radius:20px;padding:1.6rem;cursor:pointer;transition:transform .4s cubic-bezier(.16,1,.3,1),box-shadow .4s cubic-bezier(.16,1,.3,1),border-color .4s ease,background .4s ease;position:relative;overflow:hidden;
   backdrop-filter:blur(16px) saturate(180%);
   -webkit-backdrop-filter:blur(16px) saturate(180%);
   box-shadow:0 1px 0 rgba(255,255,255,.08) inset,0 8px 32px rgba(0,0,0,.4);
 }
-.svc-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(249,115,22,.08),transparent);opacity:0;transition:.3s;}
+.svc-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(249,115,22,.08),transparent);opacity:0;transition:opacity .4s ease;}
 .svc-card:hover{
   border-color:rgba(249,115,22,.4);
-  transform:translateY(-4px);
+  transform:translateY(-6px) scale(1.015);
   box-shadow:0 1px 0 rgba(255,255,255,.12) inset,0 24px 60px rgba(0,0,0,.6),0 0 40px rgba(249,115,22,.12);
   background:rgba(249,115,22,.06);
 }
@@ -1256,7 +1256,8 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .ft-bot p{color:var(--mu);font-size:.76rem;}
 
 /* ── SERVICE PAGE ── */
-.svcpg{padding:92px 5% 55px;}
+.svcpg{padding:92px 5% 55px;animation:pgEnter .5s cubic-bezier(.16,1,.3,1) both;}
+@keyframes pgEnter{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 .back-btn{display:flex;width:fit-content;align-items:center;gap:.5rem;color:var(--mu);font-size:.82rem;cursor:pointer;margin-bottom:1.8rem;transition:color .2s;font-weight:600;}
 .back-btn:hover{color:var(--acc);}
 .svcpg-top{display:flex;align-items:flex-start;gap:1.4rem;margin-bottom:2.3rem;padding:2.2rem 2rem;border-radius:20px;border:1px solid var(--bdr);position:relative;overflow:hidden;background:linear-gradient(135deg,var(--svc-tint,rgba(249,115,22,.10)) 0%,transparent 65%),var(--s1);}
@@ -1438,6 +1439,44 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 .chart-fade{animation:chartFadeIn .55s cubic-bezier(.22,1,.36,1) both;animation-delay:.15s;}
 .hero-stat-spark svg polyline,.chart-fade svg polyline{stroke-dasharray:600;stroke-dashoffset:600;animation:drawLine 1s ease forwards;animation-delay:.25s;}
 @keyframes drawLine{to{stroke-dashoffset:0;}}
+
+/* ══════════════════════════════════════
+   GLOBAL SCROLL-REVEAL SYSTEM
+   ══════════════════════════════════════ */
+.reveal{opacity:0;transform:translateY(28px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1);}
+.reveal.vis{opacity:1;transform:translateY(0);}
+.reveal-scale{opacity:0;transform:scale(.92);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1);}
+.reveal-scale.vis{opacity:1;transform:scale(1);}
+.reveal-l{opacity:0;transform:translateX(-32px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1);}
+.reveal-l.vis{opacity:1;transform:translateX(0);}
+.reveal-r{opacity:0;transform:translateX(32px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1);}
+.reveal-r.vis{opacity:1;transform:translateX(0);}
+/* Staggered children — apply .reveal-stagger to a container, children get automatic cascade */
+.reveal-stagger>*{opacity:0;transform:translateY(24px);transition:opacity .6s cubic-bezier(.16,1,.3,1),transform .6s cubic-bezier(.16,1,.3,1);}
+.reveal-stagger.vis>*{opacity:1;transform:translateY(0);}
+.reveal-stagger.vis>*:nth-child(1){transition-delay:.03s;}
+.reveal-stagger.vis>*:nth-child(2){transition-delay:.09s;}
+.reveal-stagger.vis>*:nth-child(3){transition-delay:.15s;}
+.reveal-stagger.vis>*:nth-child(4){transition-delay:.21s;}
+.reveal-stagger.vis>*:nth-child(5){transition-delay:.27s;}
+.reveal-stagger.vis>*:nth-child(6){transition-delay:.33s;}
+.reveal-stagger.vis>*:nth-child(n+7){transition-delay:.38s;}
+@media(prefers-reduced-motion:reduce){
+  .reveal,.reveal-scale,.reveal-l,.reveal-r,.reveal-stagger>*{opacity:1!important;transform:none!important;transition:none!important;}
+}
+
+/* Top scroll-progress bar */
+#scrollProgress{position:fixed;top:0;left:0;height:3px;width:0%;z-index:1200;background:linear-gradient(90deg,var(--acc),var(--acc2));box-shadow:0 0 12px rgba(249,115,22,.6);transition:width .1s linear;pointer-events:none;}
+
+/* Modern lift-and-glow hover, applied broadly */
+.lift-hover{transition:transform .35s cubic-bezier(.16,1,.3,1),box-shadow .35s cubic-bezier(.16,1,.3,1);}
+.lift-hover:hover{transform:translateY(-5px);box-shadow:0 16px 40px rgba(0,0,0,.35);}
+
+/* Smoother, springier button press feedback */
+.btn-p,.btn-g,.btn-s,.n-solid,.n-pill{transition:transform .25s cubic-bezier(.34,1.56,.64,1),box-shadow .25s ease,background .25s ease,border-color .25s ease,color .25s ease;}
+.btn-p:active,.btn-g:active,.btn-s:active,.n-solid:active{transform:scale(.96);}
+.btn-p:hover{transform:translateY(-2px);}
+.btn-g:hover{transform:translateY(-2px);}
 .funnel-bar{height:26px;border-radius:6px;transition:width 1s cubic-bezier(.22,1,.36,1);}
 
 /* ── TABLE CARD ── */
@@ -1725,6 +1764,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
 </style>
 </head>
 <body>
+<div id="scrollProgress"></div>
 <!-- Custom cursor — solid orange arrow -->
 <div id="cursor-arrow">
   <svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -1849,16 +1889,16 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
   </div>
   <div class="hero">
     <div class="hero-orb o1"></div><div class="hero-orb o2"></div><div class="hero-grid"></div>
-    <div class="hero-loc">📍 Serving Ariyalur &amp; Perambalur, Tamil Nadu</div>
-    <h1>Every Service<br>Your Home Needs —<br><em>Right Here</em></h1>
-    <p>AC, construction, cabs, electrical, sand &amp; cleaning. Book in minutes, track live, done right.</p>
-    <div class="hero-btns">
+    <div class="hero-loc reveal">📍 Serving Ariyalur &amp; Perambalur, Tamil Nadu</div>
+    <h1 class="reveal" style="transition-delay:.08s;">Every Service<br>Your Home Needs —<br><em>Right Here</em></h1>
+    <p class="reveal" style="transition-delay:.16s;">AC, construction, cabs, electrical, sand &amp; cleaning. Book in minutes, track live, done right.</p>
+    <div class="hero-btns reveal-stagger">
       <button class="btn-p" onclick="showAuth('reg')">Get Started Free ✦</button>
       <button class="btn-g" onclick="scrollS('sec-svc')">Explore Services ↓</button>
       <button class="btn-g" onclick="showPublicTracker()" style="border-color:rgba(249,115,22,.4);color:var(--acc);">🔍 Track Booking</button>
       <button class="btn-g" onclick="showInvoiceRequestModal()" style="border-color:rgba(59,130,246,.4);color:var(--bl);">📄 Get Your Invoice</button>
     </div>
-    <div class="stats-row">
+    <div class="stats-row reveal-stagger">
       <div class="stat-item"><div class="stat-n" id="hs-bk">0+</div><div class="stat-l">Bookings</div></div>
       <div class="stat-item"><div class="stat-n">6</div><div class="stat-l">Services</div></div>
       <div class="stat-item"><div class="stat-n">4.9<span class="stat-star">★</span></div><div class="stat-l">Rating</div></div>
@@ -1866,15 +1906,15 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
     </div>
   </div>
   <div class="sec sec-alt" id="sec-svc">
-    <div class="ctr">
+    <div class="ctr reveal">
       <div class="stag">✦ Our Services</div>
       <h2 class="stitle">6 Services, Hundreds of Experts</h2>
       <p class="ssub">Click any service to explore all options and book the exact help you need.</p>
     </div>
-    <div class="svc-grid" id="homeGrid"></div>
+    <div class="svc-grid reveal-stagger" id="homeGrid"></div>
   </div>
   <div class="sec" id="sec-how">
-    <div class="ctr">
+    <div class="ctr reveal">
       <div class="stag">✦ Process</div>
       <h2 class="stitle">How It Works</h2>
       <p class="ssub">Four simple steps from browsing to a perfectly serviced home.</p>
@@ -1887,17 +1927,17 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
     </div>
   </div>
   <div class="sec sec-alt" id="sec-rev">
-    <div class="ctr">
+    <div class="ctr reveal">
       <div class="stag">✦ Testimonials</div>
       <h2 class="stitle">Loved Across Ariyalur &amp; Perambalur</h2>
     </div>
-    <div class="rev-grid" id="homeRevGrid"></div>
+    <div class="rev-grid reveal-stagger" id="homeRevGrid"></div>
   </div>
   <div class="sec" id="sec-con">
-    <div class="stag">✦ Contact Us</div>
-    <h2 class="stitle">We're Always Here</h2>
+    <div class="stag reveal">✦ Contact Us</div>
+    <h2 class="stitle reveal">We're Always Here</h2>
     <div class="contact-grid">
-      <div>
+      <div class="reveal-l">
         <p style="color:var(--mu);line-height:1.78;margin-bottom:1.7rem;font-size:.89rem;">Questions, quotes, or partnerships — reach us any time.</p>
         <div class="con-item"><div class="con-ic">📞</div><div class="con-det"><strong>Phone / WhatsApp</strong>+91 94XXX XXXXX</div></div>
         <div class="con-item"><div class="con-ic">📧</div><div class="con-det"><strong>Email</strong>support@servenow.in</div></div>
@@ -1905,7 +1945,7 @@ footer{background:var(--s1);border-top:1px solid var(--bdr);padding:3.8rem 5% 2r
         <div class="con-item"><div class="con-ic">📍</div><div class="con-det"><strong>Branch</strong>Perambalur, TN 621212</div></div>
         <div class="con-item"><div class="con-ic">🕐</div><div class="con-det"><strong>Hours</strong>Mon–Sat: 7 AM – 9 PM</div></div>
       </div>
-      <div class="bform" style="position:static;">
+      <div class="bform reveal-r" style="position:static;">
         <h3 style="font-family:var(--fh);font-weight:700;font-size:1.05rem;margin-bottom:1.2rem;">Send a Message</h3>
         <div class="fg"><label>Name</label><input type="text" id="c-nm" placeholder="Murugan Kumar"></div>
         <div class="fg"><label>Email</label><input type="email" id="c-em" placeholder="you@email.com"></div>
@@ -3061,8 +3101,36 @@ function renderHome(){
 }
 
 function initHowAnim(){
-  const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');}),{threshold:.15});
-  document.querySelectorAll('.how-step').forEach(el=>obs.observe(el));
+  initGlobalReveal();
+}
+function initGlobalReveal(){
+  if(window._revealObs) window._revealObs.disconnect();
+  const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting){e.target.classList.add('vis');obs.unobserve(e.target);}}),{threshold:.12,rootMargin:'0px 0px -40px 0px'});
+  document.querySelectorAll('.how-step,.reveal,.reveal-scale,.reveal-l,.reveal-r,.reveal-stagger').forEach(el=>obs.observe(el));
+  window._revealObs=obs;
+}
+function initScrollProgress(){
+  const bar=document.getElementById('scrollProgress');
+  if(!bar||window._scrollProgAttached) return;
+  window._scrollProgAttached=true;
+  window.addEventListener('scroll',()=>{
+    const h=document.documentElement;
+    const scrolled=h.scrollTop;
+    const max=h.scrollHeight-h.clientHeight;
+    bar.style.width=(max>0?(scrolled/max)*100:0)+'%';
+  },{passive:true});
+}
+function initHeroParallax(){
+  const orb1=document.querySelector('.hero-orb.o1'), orb2=document.querySelector('.hero-orb.o2');
+  if(!orb1||!orb2||window._parallaxAttached) return;
+  window._parallaxAttached=true;
+  window.addEventListener('scroll',()=>{
+    const y=window.scrollY;
+    if(y<900){
+      orb1.style.transform=`translateY(${y*0.18}px)`;
+      orb2.style.transform=`translateY(${y*-0.12}px)`;
+    }
+  },{passive:true});
 }
 
 // ══════════════════════════════════════
@@ -5448,11 +5516,10 @@ if(!_restoredRole){
     })();
   }
 }
-// How-it-works scroll animation
-(function(){
-  const obs=new IntersectionObserver(entries=>entries.forEach(e=>{if(e.isIntersecting)e.target.classList.add('vis');}),{threshold:.15});
-  document.querySelectorAll('.how-step').forEach(el=>obs.observe(el));
-})();
+// Scroll animations: reveal-on-scroll, top progress bar, subtle hero parallax
+initGlobalReveal();
+initScrollProgress();
+initHeroParallax();
 // Re-attach field clearers when DOM mutates (dynamic forms)
 new MutationObserver(()=>attachFieldClearers()).observe(document.body,{childList:true,subtree:true});
 
